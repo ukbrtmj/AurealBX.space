@@ -42,7 +42,7 @@ function computeLayout() {
   const padTop = 15, padBottom = 15;
   const availH = Math.max(200, cssHeight - padTop - padBottom);
   const availW = cssWidth - 20;
-  const MAP_ASPECT = 1.25;
+  const MAP_ASPECT = CURRENT_MAP.aspectRatio || 1.25;
   let mapH = availH, mapW = mapH * MAP_ASPECT;
   if (mapW > availW) { mapW = availW; mapH = mapW / MAP_ASPECT; }
   layout = { mapW, mapH, offsetX: (cssWidth - mapW) / 2, offsetY: padTop };
@@ -57,7 +57,7 @@ function buildMask() {
   maskCtx.scale(dpr, dpr);
   maskCtx.clearRect(0, 0, cssWidth, cssHeight);
   maskCtx.fillStyle = '#fff';
-  [COASTLINE_AMERICAS, COASTLINE_AFRICA].forEach(coastline => {
+  CURRENT_MAP.coastlines.forEach(coastline => {
     const pts = coastline.map(([nx, ny]) => toCanvas(nx, ny));
     maskCtx.beginPath();
     pts.forEach((p, i) => i === 0 ? maskCtx.moveTo(p.x, p.y) : maskCtx.lineTo(p.x, p.y));
@@ -68,7 +68,7 @@ function buildMask() {
 }
 
 function buildVoronoi() {
-  const pts = COUNTRY_DEFS.map(c => { const p = toCanvas(c.nx, c.ny); return [p.x, p.y]; });
+  const pts = CURRENT_MAP.countryDefs.map(c => { const p = toCanvas(c.nx, c.ny); return [p.x, p.y]; });
   delaunay = d3.Delaunay.from(pts);
   const pad = 40;
   voronoi = delaunay.voronoi([layout.offsetX - pad, layout.offsetY - pad, layout.offsetX + layout.mapW + pad, layout.offsetY + layout.mapH + pad]);
@@ -86,13 +86,13 @@ function pointInPoly(pt, poly) {
 
 function initGame() {
   computeLayout(); buildVoronoi(); buildMask();
-  const points = COUNTRY_DEFS.map(c => toCanvas(c.nx, c.ny));
+  const points = CURRENT_MAP.countryDefs.map(c => toCanvas(c.nx, c.ny));
   
-  const territories = COUNTRY_DEFS.map((c, i) => new Territory(i, c.code, points[i].x, points[i].y));
+  const territories = CURRENT_MAP.countryDefs.map((c, i) => new Territory(i, c.code, points[i].x, points[i].y));
 
   state = { territories };
 
-  const startIdx = 5; // Brasil
+  const startIdx = CURRENT_MAP.startTerritoryIndex || 0;
   territories[startIdx].owner = 1;
   territories[startIdx].troops = 37;
 
@@ -109,12 +109,12 @@ function updateScores() {
   
   const pSeg = document.createElement('div');
   pSeg.style.width = (count / total * 100) + '%';
-  pSeg.style.background = COLORS[1];
+  pSeg.style.background = CURRENT_MAP.colors[1];
   bar.appendChild(pSeg);
 
   const nSeg = document.createElement('div');
   nSeg.style.width = ((total - count) / total * 100) + '%';
-  nSeg.style.background = COLORS[0];
+  nSeg.style.background = CURRENT_MAP.colors[0];
   bar.appendChild(nSeg);
 
   if (running && count === total) endGame(true);
@@ -168,7 +168,7 @@ function resolveArrival(m) {
   const t = state.territories[m.toId];
   t.impactAnim = 1.0;
 
-  const color = COLORS[m.owner];
+  const color = CURRENT_MAP.colors[m.owner];
   for (let i = 0; i < 5; i++) {
     hitParticles.push(new Particle(t.x, t.y, color));
   }
@@ -302,7 +302,7 @@ function render() {
     poly.forEach((p, i) => i === 0 ? offCtx.moveTo(p[0], p[1]) : offCtx.lineTo(p[0], p[1]));
     offCtx.closePath();
     
-    offCtx.fillStyle = COLORS[t.owner];
+    offCtx.fillStyle = CURRENT_MAP.colors[t.owner];
     offCtx.fill();
     
     offCtx.strokeStyle = '#0f172a';
@@ -378,7 +378,7 @@ function render() {
       const waveRadius = 17 + (1 - t.pulseAnim) * 28;
       ctx.beginPath();
       ctx.arc(t.x, t.y, waveRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = COLORS[t.owner];
+      ctx.strokeStyle = CURRENT_MAP.colors[t.owner];
       ctx.lineWidth = 3 * t.pulseAnim;
       ctx.globalAlpha = t.pulseAnim;
       ctx.stroke();
