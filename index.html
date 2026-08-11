@@ -2,47 +2,349 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Domínio - Jogo de Estratégia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home</title>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: radial-gradient(circle at center, #1e1e2f 0%, #0d0d15 100%);
+      font-family: 'Roboto Slab', serif;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Brilho de fundo sutil */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: rgba(255, 215, 0, 0.05);
+      filter: blur(100px);
+      border-radius: 50%;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+      width: 100%;
+      transition: filter 0.3s ease;
+    }
+
+    /* Logo grande */
+    .logo {
+      max-width: 420px;
+      width: 90%;
+      height: auto;
+      margin-bottom: 50px;
+      filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+      transition: transform 0.3s ease;
+    }
+
+    .logo:hover {
+      transform: scale(1.02);
+    }
+
+    /* Grupo de Botões */
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    /* Estilo dos Botões */
+    .btn {
+      font-family: 'Roboto Slab', serif;
+      font-weight: 700;
+      font-size: 1.3rem;
+      color: #000000;
+      background-color: #FFD700;
+      border: 3px solid #000000;
+      padding: 16px 24px;
+      border-radius: 12px;
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0px 6px 0px #000000;
+      transition: all 0.15s ease;
+      cursor: pointer;
+      display: block;
+      text-align: center;
+    }
+
+    .btn:hover {
+      background-color: #FFE033;
+      transform: translateY(-2px);
+      box-shadow: 0px 8px 0px #000000;
+    }
+
+    .btn:active {
+      transform: translateY(4px);
+      box-shadow: 0px 2px 0px #000000;
+    }
+
+    /* --- POPUP / OVERLAY --- */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      z-index: 10;
+    }
+
+    .overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Card do Pop-up */
+    .modal {
+      background-color: #1a1a24;
+      border: 3px solid #FFD700;
+      border-radius: 16px;
+      padding: 30px 25px;
+      width: 90%;
+      max-width: 380px;
+      text-align: center;
+      box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.7);
+      transform: scale(0.8);
+      transition: transform 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal h2 {
+      color: #FFFFFF;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      font-weight: 700;
+    }
+
+    /* --- ÁREA DA FOTO / AVATAR --- */
+    .avatar-upload {
+      position: relative;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+
+    .avatar-preview {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      border: 3px solid #FFD700;
+      background-color: #0d0d15;
+      color: #FFD700;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2.5rem;
+      font-weight: 900;
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .avatar-upload:hover .avatar-preview {
+      transform: scale(1.05);
+      border-color: #FFE033;
+    }
+
+    /* Ícone discreto de câmera/upload */
+    .avatar-badge {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      background-color: #FFD700;
+      color: #000;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.8rem;
+      border: 2px solid #000;
+    }
+
+    /* Esconde o campo padrão de carregar arquivo */
+    #uploadFoto {
+      display: none;
+    }
+
+    /* Campo de Texto (Textbox) */
+    .modal input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      font-family: 'Roboto Slab', serif;
+      font-size: 1rem;
+      background-color: #0d0d15;
+      color: #FFFFFF;
+      border: 2px solid #FFD700;
+      border-radius: 8px;
+      outline: none;
+      margin-bottom: 24px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      text-align: center;
+    }
+
+    .modal input[type="text"]:focus {
+      box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    }
+
+    /* Botões dentro do Modal */
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+      font-size: 1rem;
+      padding: 12px;
+    }
+
+    .btn-secondary {
+      background-color: #333344;
+      color: #FFFFFF;
+      border: 3px solid #000000;
+    }
+
+    .btn-secondary:hover {
+      background-color: #444455;
+    }
+  </style>
 </head>
 <body>
 
-<div id="homeScreen">
-  <img src="https://file.garden/anP6_SXXiQfEPX26/file_000000000c14820e9f74ff8e3421f51c.png" alt="Logo Domínio" class="home-logo">
-  
-  <div class="home-buttons">
-    <button id="btnOnline" class="btn-yellow">Online</button>
-    <button id="btnLocal" class="btn-yellow">Local</button>
-  </div>
-</div>
+  <div class="container">
+    <img src="https://file.garden/anP6_SXXiQfEPX26/file_000000000c14820e9f74ff8e3421f51c.png" alt="Logo" class="logo">
 
-<div id="hud">
-  <div id="bar"></div>
-  <div id="controls">
-    <div id="legend">
-      <span><i class="ldot" style="background:#2563eb"></i>Você</span>
-      <span><i class="ldot" style="background:#64748b"></i>Neutro</span>
+    <div class="button-group">
+      <button class="btn" id="btnOnline">Online</button>
+      <a href="#local" class="btn">Local</a>
     </div>
-    <button id="restartBtn" class="btn">Reiniciar</button>
   </div>
-</div>
 
-<div id="canvasWrap">
-  <canvas id="game"></canvas>
-  <div id="overlay">
-    <h1 id="overlayTitle"></h1>
-    <p id="overlaySub"></p>
-    <button id="overlayBtn">Jogar Novamente</button>
+  <div class="overlay" id="popupOverlay">
+    <div class="modal">
+      <h2>Coloque seu Nome</h2>
+
+      <label for="uploadFoto" class="avatar-upload" title="Clique para escolher uma foto">
+        <div class="avatar-preview" id="avatarPreview">?</div>
+        <div class="avatar-badge">📷</div>
+      </label>
+      <input type="file" id="uploadFoto" accept="image/*">
+
+      <input type="text" id="nomeUsuario" placeholder="Digite seu nome..." autocomplete="off" maxlength="15">
+      
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnCancelar">Cancelar</button>
+        <button class="btn" id="btnConfirmar">Entrar</button>
+      </div>
+    </div>
   </div>
-</div>
 
-<script src="maps/americas_africa.js"></script>
-<script src="api/entities.js"></script>
-<script src="api/game.js"></script>
+  <script>
+    const btnOnline = document.getElementById('btnOnline');
+    const popupOverlay = document.getElementById('popupOverlay');
+    const btnCancelar = document.getElementById('btnCancelar');
+    const btnConfirmar = document.getElementById('btnConfirmar');
+    const inputNome = document.getElementById('nomeUsuario');
+    const inputFoto = document.getElementById('uploadFoto');
+    const avatarPreview = document.getElementById('avatarPreview');
+
+    let fotoPersonalizada = false;
+
+    // Abrir o pop-up
+    btnOnline.addEventListener('click', () => {
+      popupOverlay.classList.add('active');
+      inputNome.focus();
+    });
+
+    // Fechar o pop-up
+    btnCancelar.addEventListener('click', () => {
+      popupOverlay.classList.remove('active');
+    });
+
+    // Atualiza a primeira letra dinamicamente se o usuário NÃO tiver colocado foto
+    inputNome.addEventListener('input', () => {
+      if (!fotoPersonalizada) {
+        const texto = inputNome.value.trim();
+        avatarPreview.textContent = texto ? texto.charAt(0).toUpperCase() : '?';
+      }
+    });
+
+    // Carregar foto do dispositivo
+    inputFoto.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          avatarPreview.style.backgroundImage = `url('${event.target.result}')`;
+          avatarPreview.textContent = ''; // Limpa a letra
+          fotoPersonalizada = true;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Fechar ao clicar fora do card
+    popupOverlay.addEventListener('click', (e) => {
+      if (e.target === popupOverlay) {
+        popupOverlay.classList.remove('active');
+      }
+    });
+
+    // Confirmar
+    btnConfirmar.addEventListener('click', () => {
+      const nome = inputNome.value.trim();
+      if (nome) {
+        alert(`Bem-vindo, ${nome}!`);
+        popupOverlay.classList.remove('active');
+      } else {
+        alert('Por favor, digite seu nome.');
+      }
+    });
+  </script>
+
 </body>
 </html>
