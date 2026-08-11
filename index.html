@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Domínio - Jogo de Estratégia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+</head>
+<body>
+
+<div id="hud">
+  <div id="bar"></div>
+  <div id="controls">
+    <div id="legend">
+      <span><i class="ldot" style="background:#2563eb"></i>Você</span>
+      <span><i class="ldot" style="background:#64748b"></i>Neutro</span>
+    </div>
+    <button id="restartBtn" class="btn">Reiniciar</button>
+  </div>
+</div>
+
+<div id="canvasWrap">
+  <canvas id="game"></canvas>
+  <div id="overlay">
+    <h1 id="overlayTitle"></h1>
+    <p id="overlaySub"></p>
+    <button id="overlayBtn">Jogar Novamente</button>
+  </div>
+</div>
+
+<script src="api/mapData.js"></script>
+<script src="api/entities.js"></script>
+<script src="api/game.js"></script>
+</body>
+</html>
