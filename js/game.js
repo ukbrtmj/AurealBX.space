@@ -231,6 +231,13 @@ function sendTroops(fromId, toId) {
   const totalToSend = Math.floor(from.troops);
   if (totalToSend < 1) return;
 
+  // Reserva as tropas IMEDIATAMENTE ao enviar. Antes, o desconto só
+  // acontecia aos poucos (a cada onda, com atraso), então clicar/arrastar
+  // rápido duas vezes lia o mesmo total de tropas duas vezes e duplicava
+  // o envio (ex.: 80 tropas viravam 160 enviadas). Descontando na hora,
+  // a segunda chamada já vê o valor correto e reduzido.
+  from.troops -= totalToSend;
+
   const dist = Math.hypot(to.x - from.x, to.y - from.y);
   const fixedDuration = Math.min(MAX_DURATION, Math.max(MIN_DURATION, dist / TROOP_SPEED));
 
@@ -251,9 +258,7 @@ function sendTroops(fromId, toId) {
         progress: 0,
         delay: waveIndex * 0.5,
         duration: fixedDuration,
-        maxOffset: offsetFactor,
-        isFirstInWave: (b === 0),
-        waveAmount: ballsInWave
+        maxOffset: offsetFactor
       });
       remaining -= 1;
     }
@@ -482,12 +487,6 @@ function loop(now) {
         if (m.delay > 0) {
           m.delay -= dt;
           continue;
-        }
-
-        if (m.isFirstInWave) {
-          const fromT = state.territories[m.fromId];
-          fromT.troops = Math.max(0, fromT.troops - m.waveAmount);
-          m.isFirstInWave = false;
         }
 
         m.progress += dt / m.duration;
