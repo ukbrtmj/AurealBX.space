@@ -13,7 +13,8 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="/socket.io/socket.io.js"></script>
+  
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <style>
     * {
@@ -33,7 +34,6 @@
       position: relative;
     }
 
-    /* Brilho de fundo sutil */
     body::before {
       content: '';
       position: absolute;
@@ -67,7 +67,6 @@
       width: 100%;
     }
 
-    /* Logo grande */
     .logo {
       max-width: 420px;
       width: 90%;
@@ -81,7 +80,6 @@
       transform: scale(1.02);
     }
 
-    /* Grupo de Botões */
     .button-group {
       display: flex;
       flex-direction: column;
@@ -90,7 +88,6 @@
       max-width: 300px;
     }
 
-    /* Estilo dos Botões Amarelos com Contorno */
     .btn {
       font-family: 'Roboto Slab', serif;
       font-weight: 700;
@@ -124,7 +121,6 @@
       box-shadow: 0px 2px 0px #000000;
     }
 
-    /* --- POPUPS / OVERLAYS --- */
     .overlay {
       position: fixed;
       top: 0;
@@ -147,7 +143,6 @@
       visibility: visible;
     }
 
-    /* Estrutura dos Cards Pop-up */
     .modal {
       background-color: #1a1a24;
       border: 3px solid #FFD700;
@@ -177,7 +172,6 @@
       letter-spacing: 1px;
     }
 
-    /* --- ÁREA DA FOTO / AVATAR --- */
     .avatar-upload {
       position: relative;
       margin-bottom: 20px;
@@ -201,10 +195,6 @@
       background-position: center;
       box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
       transition: transform 0.2s ease;
-    }
-
-    .avatar-upload:hover .avatar-preview {
-      transform: scale(1.05);
     }
 
     .avatar-badge {
@@ -231,7 +221,6 @@
       display: none;
     }
 
-    /* Inputs nos Modais */
     .modal input[type="text"] {
       width: 100%;
       padding: 14px 16px;
@@ -284,7 +273,6 @@
       font-size: 1.1rem;
     }
 
-    /* --- LOBBY DO HOST --- */
     .host-header {
       width: 100%;
       display: flex;
@@ -530,17 +518,13 @@
   <script src="api/entities.js"></script>
 
   <script>
-    // Conexão com o Socket.io (se disponível)
-    const socket = typeof io !== 'undefined' ? io() : null;
-
-    // Elementos e Modais
+    // Elementos da Interface
     const homeScreen = document.getElementById('homeScreen');
     const popupNome = document.getElementById('popupNome');
     const popupOpcoes = document.getElementById('popupOpcoes');
     const popupCodigo = document.getElementById('popupCodigo');
     const popupHost = document.getElementById('popupHost');
 
-    // Botões
     const btnOnline = document.getElementById('btnOnline');
     const btnLocal = document.getElementById('btnLocal');
     const btnCancelarNome = document.getElementById('btnCancelarNome');
@@ -554,7 +538,6 @@
     const btnSairHost = document.getElementById('btnSairHost');
     const btnIniciarPartida = document.getElementById('btnIniciarPartida');
 
-    // Inputs e Exibição
     const inputNome = document.getElementById('nomeUsuario');
     const inputFoto = document.getElementById('uploadFoto');
     const avatarPreview = document.getElementById('avatarPreview');
@@ -562,25 +545,30 @@
     const codigoDisplay = document.getElementById('codigoDisplay');
     const listaJogadores = document.getElementById('listaJogadores');
 
-    // Variáveis de Estado
+    // Estado do Jogador & P2P
     let fotoPersonalizada = false;
     let urlFotoPerfil = null;
     let nomeJogadorLocal = '';
     let codigoSalaAtual = '';
     let codigoVisivel = false;
+    let isHost = false;
 
-    // Inicialização dos ícones do Lucide
+    // Instâncias do PeerJS
+    let peer = null;
+    let conexoesCliente = []; // Usado pelo Host para listar clientes
+    let conexaoHost = null;   // Usado pelos Clientes para falar com o Host
+    let listaJogadoresData = [];
+
     lucide.createIcons();
 
-    // Utilitário: Gerar código local se não houver backend
-    function gerarCodigoLocal() {
+    // Gera Código de 5 dígitos em maiúsculo
+    function gerarCodigoRandomico() {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
       let res = '';
       for (let i = 0; i < 5; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
       return res;
     }
 
-    // Renderiza a lista de participantes na Sala
     function renderizarListaJogadores(jogadores) {
       listaJogadores.innerHTML = '';
       jogadores.forEach(j => {
@@ -606,7 +594,6 @@
       lucide.createIcons();
     }
 
-    // Alternar visibilidade do código da sala
     function atualizarDisplayCodigo() {
       const iconEye = document.getElementById('iconEye');
       if (codigoVisivel) {
@@ -619,7 +606,7 @@
       lucide.createIcons();
     }
 
-    // Modo Local
+    // Iniciar Jogo Offline / Local
     btnLocal.addEventListener('click', () => {
       homeScreen.style.display = 'none';
       document.getElementById('hud').style.display = 'block';
@@ -627,7 +614,7 @@
       if (typeof initGame === 'function') initGame();
     });
 
-    // Fluxo Online
+    // Navegação do Menu
     btnOnline.addEventListener('click', () => {
       popupNome.classList.add('active');
       inputNome.focus();
@@ -677,78 +664,140 @@
       setTimeout(() => popupOpcoes.classList.add('active'), 200);
     });
 
-    // Ação Host
+    // ==========================================
+    // LÓGICA DO HOST (Criação de Sala via PeerJS)
+    // ==========================================
     btnHost.addEventListener('click', () => {
-      if (socket) {
-        socket.emit('CRIAR_SALA', { nome: nomeJogadorLocal, foto: urlFotoPerfil });
-      } else {
-        // Fallback visual sem servidor
-        codigoSalaAtual = gerarCodigoLocal();
+      isHost = true;
+      codigoSalaAtual = gerarCodigoRandomico();
+      
+      // Cria a sala P2P usando o prefixo DOMINIO_
+      peer = new Peer('DOMINIO_' + codigoSalaAtual);
+
+      peer.on('open', (id) => {
         codigoVisivel = false;
         atualizarDisplayCodigo();
-        renderizarListaJogadores([{ nome: nomeJogadorLocal, foto: urlFotoPerfil, isHost: true }]);
+
+        listaJogadoresData = [{
+          id: peer.id,
+          nome: nomeJogadorLocal,
+          foto: urlFotoPerfil,
+          isHost: true
+        }];
+
+        renderizarListaJogadores(listaJogadoresData);
         popupOpcoes.classList.remove('active');
         setTimeout(() => popupHost.classList.add('active'), 200);
+      });
+
+      // Escuta novos participantes entrando
+      peer.on('connection', (conn) => {
+        conexoesCliente.push(conn);
+
+        conn.on('data', (data) => {
+          if (data.tipo === 'ENTRAR') {
+            listaJogadoresData.push({
+              id: conn.peer,
+              nome: data.nome,
+              foto: data.foto,
+              isHost: false
+            });
+
+            // Notifica todos na sala
+            transmitirParaTodos({
+              tipo: 'ATUALIZAR_LISTA',
+              jogadores: listaJogadoresData
+            });
+
+            renderizarListaJogadores(listaJogadoresData);
+          }
+        });
+
+        conn.on('close', () => {
+          listaJogadoresData = listaJogadoresData.filter(j => j.id !== conn.peer);
+          transmitirParaTodos({
+            tipo: 'ATUALIZAR_LISTA',
+            jogadores: listaJogadoresData
+          });
+          renderizarListaJogadores(listaJogadoresData);
+        });
+      });
+
+      peer.on('error', (err) => {
+        alert('Erro ao criar sala. Tente novamente.');
+        console.error(err);
+      });
+    });
+
+    function transmitirParaTodos(msg) {
+      conexoesCliente.forEach(c => {
+        if (c.open) c.send(msg);
+      });
+    }
+
+    // ==========================================
+    // LÓGICA DO JOGADOR (Entrar via Código)
+    // ==========================================
+    btnEntrarCodigo.addEventListener('click', () => {
+      const cod = inputCodigoSala.value.trim().toUpperCase();
+      if (cod.length !== 5) {
+        alert('Digite um código válido de 5 caracteres.');
+        return;
+      }
+
+      isHost = false;
+      codigoSalaAtual = cod;
+
+      peer = new Peer(); // ID aleatório para o cliente
+
+      peer.on('open', () => {
+        conexaoHost = peer.connect('DOMINIO_' + cod);
+
+        conexaoHost.on('open', () => {
+          // Envia perfil ao Host
+          conexaoHost.send({
+            tipo: 'ENTRAR',
+            nome: nomeJogadorLocal,
+            foto: urlFotoPerfil
+          });
+
+          popupCodigo.classList.remove('active');
+          btnIniciarPartida.style.display = 'none'; // Esconde botão de iniciar para cliente
+          setTimeout(() => popupHost.classList.add('active'), 200);
+        });
+
+        conexaoHost.on('data', (data) => {
+          if (data.tipo === 'ATUALIZAR_LISTA') {
+            renderizarListaJogadores(data.jogadores);
+          } else if (data.tipo === 'INICIAR_PARTIDA') {
+            iniciarTelaJogo();
+          }
+        });
+
+        conexaoHost.on('error', () => {
+          alert('Não foi possível conectar a essa sala.');
+        });
+      });
+
+      peer.on('error', (err) => {
+        alert('Sala não encontrada ou inacessível.');
+      });
+    });
+
+    // Iniciar Partida (Host avisa todos)
+    btnIniciarPartida.addEventListener('click', () => {
+      if (isHost) {
+        transmitirParaTodos({ tipo: 'INICIAR_PARTIDA' });
+        iniciarTelaJogo();
       }
     });
 
-    // Eventos recebidos do servidor via Socket
-    if (socket) {
-      socket.on('SALA_CRIADA', ({ codigo, jogadores }) => {
-        codigoSalaAtual = codigo;
-        codigoVisivel = false;
-        atualizarDisplayCodigo();
-        renderizarListaJogadores(jogadores);
-        popupOpcoes.classList.remove('active');
-        setTimeout(() => popupHost.classList.add('active'), 200);
-      });
-
-      btnEntrarCodigo.addEventListener('click', () => {
-        const cod = inputCodigoSala.value.trim().toUpperCase();
-        if (cod.length === 5) {
-          socket.emit('ENTRAR_SALA', { codigo: cod, jogadorData: { nome: nomeJogadorLocal, foto: urlFotoPerfil } });
-        } else {
-          alert('Digite um código de 5 caracteres.');
-        }
-      });
-
-      socket.on('ERRO_SALA', (msg) => alert(msg));
-
-      socket.on('ATUALIZAR_JOGADORES', (jogadores) => {
-        codigoVisivel = false;
-        atualizarDisplayCodigo();
-        renderizarListaJogadores(jogadores);
-        popupCodigo.classList.remove('active');
-        popupHost.classList.add('active');
-      });
-
-      btnIniciarPartida.addEventListener('click', () => socket.emit('INICIAR_PARTIDA'));
-
-      socket.on('PARTIDA_INICIADA', () => {
-        popupHost.classList.remove('active');
-        homeScreen.style.display = 'none';
-        document.getElementById('hud').style.display = 'block';
-        document.getElementById('canvasWrap').style.display = 'block';
-        if (typeof initGame === 'function') initGame();
-      });
-    } else {
-      btnEntrarCodigo.addEventListener('click', () => {
-        const cod = inputCodigoSala.value.trim().toUpperCase();
-        if (cod.length === 5) {
-          alert(`Conectando localmente à sala: ${cod}`);
-          popupCodigo.classList.remove('active');
-        } else {
-          alert('Digite um código de 5 caracteres.');
-        }
-      });
-
-      btnIniciarPartida.addEventListener('click', () => {
-        popupHost.classList.remove('active');
-        homeScreen.style.display = 'none';
-        document.getElementById('hud').style.display = 'block';
-        document.getElementById('canvasWrap').style.display = 'block';
-        if (typeof initGame === 'function') initGame();
-      });
+    function iniciarTelaJogo() {
+      popupHost.classList.remove('active');
+      homeScreen.style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+      document.getElementById('canvasWrap').style.display = 'block';
+      if (typeof initGame === 'function') initGame();
     }
 
     btnToggleCodigo.addEventListener('click', () => {
@@ -759,11 +808,11 @@
     btnConfigSala.addEventListener('click', () => alert('Configurações em breve!'));
 
     btnSairHost.addEventListener('click', () => {
+      if (peer) peer.destroy();
       popupHost.classList.remove('active');
       setTimeout(() => popupOpcoes.classList.add('active'), 200);
     });
 
-    // Fechar modais clicando fora
     [popupNome, popupOpcoes, popupCodigo, popupHost].forEach(modal => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.remove('active');
