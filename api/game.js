@@ -1,4 +1,4 @@
-// Referências ao Canvas principal e buffer offline
+// Referências ao Canvas principal e de buffer offline
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const wrap = document.getElementById('canvasWrap');
@@ -22,7 +22,7 @@ let dragPos = null;
 let running = false;
 let lastGrowth = 0;
 
-// Configuração de Velocidade e Tempo das Tropas
+// Configuração de Velocidade das Tropas
 const TROOP_SPEED = 60;
 const MIN_DURATION = 1.2;
 const MAX_DURATION = 8.0;
@@ -104,23 +104,16 @@ function initGame() {
   const territories = CURRENT_MAP.countryDefs.map((c, i) => new Territory(i, c.code, points[i].x, points[i].y));
   state = { territories };
 
-  // Se for o Host, distribui territórios entre os jogadores conectados (1 a N)
-  if (typeof isHost !== 'undefined' && isHost) {
-    const numJogadores = (typeof listaJogadoresData !== 'undefined' && listaJogadoresData.length > 0) ? listaJogadoresData.length : 1;
-    
-    // Distribuição inicial dos países entre os jogadores conectados
-    territories.forEach((t, index) => {
-      if (index < numJogadores * 2) { 
-        t.owner = (index % numJogadores) + 1;
-        t.troops = 25;
-      } else {
-        t.owner = 0; // Neutro
-        t.troops = 15;
-      }
-    });
-
-    transmitirEstadoGame();
-  }
+  // Distribuição básica dos territórios
+  territories.forEach((t, index) => {
+    if (index < 4) {
+      t.owner = (index % 2) + 1; // Jogadores 1 e 2 iniciam ocupando alguns
+      t.troops = 25;
+    } else {
+      t.owner = 0; // Neutros
+      t.troops = 15;
+    }
+  });
 
   moves = []; 
   hitParticles = []; 
@@ -129,24 +122,7 @@ function initGame() {
   running = true; 
   lastGrowth = 0;
 
-  document.getElementById('overlay').style.display = 'none';
   updateScores();
-}
-
-// Sincronização P2P: Envia dados do mapa para todos
-function transmitirEstadoGame() {
-  if (typeof isHost === 'undefined' || !isHost || !state || typeof transmitirParaTodos !== 'function') return;
-
-  const dadosSync = {
-    tipo: 'SYNC_STATE',
-    territories: state.territories.map(t => ({
-      id: t.id,
-      owner: t.owner,
-      troops: t.troops
-    }))
-  };
-
-  transmitirParaTodos(dadosSync);
 }
 
 function updateScores() {
@@ -157,10 +133,9 @@ function updateScores() {
   bar.innerHTML = '';
   const total = state.territories.length;
 
-  // Renderiza no HUD a barra proporcional de cada cor/jogador presente no mapa
   Object.keys(CURRENT_MAP.colors).forEach(ownerId => {
     const id = parseInt(ownerId);
-    if (id === 0) return; // Ignora o neutro na barra do HUD
+    if (id === 0) return;
 
     const count = state.territories.filter(t => t.owner === id).length;
     if (count > 0) {
@@ -228,18 +203,11 @@ function resolveArrival(m) {
     }
   }
   updateScores();
-
-  if (typeof isHost !== 'undefined' && isHost) {
-    transmitirEstadoGame();
-  }
 }
 
 function growthTick() {
   for (const t of state.territories) {
-    if (t.owner > 0) t.troops += 1; // Todos os territórios ocupados ganham +1 tropa
-  }
-  if (typeof isHost !== 'undefined' && isHost) {
-    transmitirEstadoGame();
+    if (t.owner > 0) t.troops += 1;
   }
 }
 
@@ -258,7 +226,6 @@ function getPos(e) {
   return { x: src.clientX - rect.left, y: src.clientY - rect.top };
 }
 
-// Permite controlar APENAS as tropas da cor do jogador local
 function onDown(e) {
   if (!running) return;
   const p = getPos(e);
@@ -286,15 +253,7 @@ function onUp(e) {
   const t = territoryAt(p.x, p.y);
 
   if (t && t.id !== selected.id) {
-    if (typeof isHost === 'undefined' || isHost) {
-      sendTroops(selected.id, t.id);
-    } else if (typeof conexaoHost !== 'undefined' && conexaoHost && conexaoHost.open) {
-      conexaoHost.send({
-        tipo: 'ENVIAR_TROPAS',
-        fromId: selected.id,
-        toId: t.id
-      });
-    }
+    sendTroops(selected.id, t.id);
   }
   selected = null; 
   dragPos = null;
@@ -310,9 +269,6 @@ canvas.addEventListener('touchend', onUp, { passive: false });
 const restartBtn = document.getElementById('restartBtn');
 if (restartBtn) restartBtn.addEventListener('click', initGame);
 
-const overlayBtn = document.getElementById('overlayBtn');
-if (overlayBtn) overlayBtn.addEventListener('click', initGame);
-
 // Loop Principal de Renderização
 let lastTime = performance.now();
 
@@ -321,12 +277,10 @@ function loop(now) {
   lastTime = now;
 
   if (running) {
-    if (typeof isHost === 'undefined' || isHost) {
-      lastGrowth += dt;
-      if (lastGrowth > 1.5) { 
-        growthTick(); 
-        lastGrowth = 0; 
-      }
+    lastGrowth += dt;
+    if (lastGrowth > 1.5) { 
+      growthTick(); 
+      lastGrowth = 0; 
     }
 
     for (const t of state.territories) {
@@ -497,4 +451,8 @@ function render() {
   ctx.restore();
 }
 
-requestAnimationFrame(loop);
+// Inicia automaticamente o mapa assim que a página é aberta
+window.addEventListener('load', () => {
+  initGame();
+  requestAnimationFrame(loop);
+});
