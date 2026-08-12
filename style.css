@@ -423,6 +423,71 @@ body::before {
   height: 16px; 
 }
 
+/* Timer de 5 Segundos */
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 13, 21, 0.88);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.countdown-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.countdown-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.countdown-title {
+  color: #94a3b8;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+
+.countdown-number {
+  font-size: 6rem;
+  font-weight: 900;
+  color: #FFD700;
+  text-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+  animation: pulseNumber 1s infinite alternate;
+}
+
+@keyframes pulseNumber {
+  from { transform: scale(0.9); }
+  to { transform: scale(1.1); }
+}
+
+/* Animação do Mapa */
+.map-appear {
+  animation: zoomFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes zoomFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
 /* ==========================================================================
    6. INTERFACE DO JOGO (HUD E CANVAS)
    ========================================================================== */
