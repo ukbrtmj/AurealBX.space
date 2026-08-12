@@ -1,44 +1,48 @@
 const CURRENT_MAP = {
-  colors: { 0: '#94a3b8', 1: '#2563eb' },
-  aspectRatio: 1.25,
-  startTerritoryIndex: 5, // Brasil
-  
+  // Paleta de Cores: 0 = Neutro, 1 a 6 = Jogadores
+  colors: { 
+    0: '#94a3b8', // Neutro (Cinza)
+    1: '#2563eb', // Jogador 1 (Azul)
+    2: '#dc2626', // Jogador 2 (Vermelho)
+    3: '#16a34a', // Jogador 3 (Verde)
+    4: '#ca8a04', // Jogador 4 (Amarelo)
+    5: '#9333ea', // Jogador 5 (Roxo)
+    6: '#ea580c'  // Jogador 6 (Laranja)
+  },
+  aspectRatio: 0.9,
+  startTerritoryIndex: 0,
+
   countryDefs: [
-    // Américas
-    { code: 'CAN', nx: 0.18, ny: 0.09 },
-    { code: 'EUA', nx: 0.20, ny: 0.21 },
-    { code: 'MEX', nx: 0.15, ny: 0.31 },
-    { code: 'CAM', nx: 0.20, ny: 0.37 },
-    { code: 'COL', nx: 0.25, ny: 0.45 },
-    { code: 'BRA', nx: 0.27, ny: 0.57 },
-    { code: 'PER', nx: 0.15, ny: 0.57 },
-    { code: 'ARG', nx: 0.20, ny: 0.74 },
-    // África
-    { code: 'MAR', nx: 0.62, ny: 0.13 },
-    { code: 'EGI', nx: 0.75, ny: 0.12 },
-    { code: 'NIG', nx: 0.58, ny: 0.27 },
-    { code: 'ETI', nx: 0.85, ny: 0.23 },
-    { code: 'CGO', nx: 0.64, ny: 0.41 },
-    { code: 'QUE', nx: 0.80, ny: 0.37 },
-    { code: 'ANG', nx: 0.66, ny: 0.54 },
-    { code: 'RSA', nx: 0.72, ny: 0.67 }
+    { code: 'MAR', nx: 0.25, ny: 0.12 }, // Marrocos
+    { code: 'ALG', nx: 0.40, ny: 0.15 }, // Argélia
+    { code: 'EGI', nx: 0.80, ny: 0.12 }, // Egito
+    { code: 'LIB', nx: 0.60, ny: 0.18 }, // Líbia
+    { code: 'SEN', nx: 0.10, ny: 0.32 }, // Senegal
+    { code: 'NIG', nx: 0.45, ny: 0.35 }, // Nigéria
+    { code: 'SUD', nx: 0.72, ny: 0.32 }, // Sudão
+    { code: 'ETI', nx: 0.88, ny: 0.38 }, // Etiópia
+    { code: 'GAB', nx: 0.42, ny: 0.52 }, // Gabão
+    { code: 'CGO', nx: 0.55, ny: 0.55 }, // Congo
+    { code: 'QUE', nx: 0.82, ny: 0.52 }, // Quênia
+    { code: 'TAN', nx: 0.78, ny: 0.62 }, // Tanzânia
+    { code: 'ANG', nx: 0.52, ny: 0.68 }, // Angola
+    { code: 'ZAM', nx: 0.65, ny: 0.72 }, // Zâmbia
+    { code: 'MOZ', nx: 0.80, ny: 0.75 }, // Moçambique
+    { code: 'MAD', nx: 0.92, ny: 0.76 }, // Madagascar
+    { code: 'NAM', nx: 0.50, ny: 0.82 }, // Namíbia
+    { code: 'RSA', nx: 0.65, ny: 0.90 }  // África do Sul
   ],
 
   coastlines: [
-    // Américas
     [
-      [0.04,0.04],[0.18,0.01],[0.33,0.05],[0.36,0.14],[0.34,0.22],
-      [0.38,0.28],[0.32,0.34],[0.24,0.32],[0.21,0.38],
-      [0.30,0.48],[0.36,0.56],[0.34,0.66],[0.28,0.74],[0.26,0.84],
-      [0.20,0.95],[0.13,0.90],[0.16,0.78],[0.10,0.70],[0.06,0.60],
-      [0.09,0.50],[0.04,0.42],[0.08,0.32],[0.03,0.22],[0.07,0.10]
+      [0.20,0.08],[0.50,0.02],[0.85,0.06],[0.98,0.22],
+      [0.92,0.38],[0.88,0.48],[0.98,0.70],[0.88,0.85],
+      [0.68,0.98],[0.45,0.88],[0.38,0.62],[0.32,0.45],
+      [0.05,0.38],[0.02,0.25],[0.15,0.15]
     ],
-    // África
+    // Madagascar
     [
-      [0.58,0.05],[0.70,0.02],[0.80,0.06],[0.90,0.13],[0.96,0.20],
-      [0.92,0.27],[0.88,0.33],[0.90,0.42],[0.86,0.52],[0.82,0.62],
-      [0.76,0.72],[0.68,0.75],[0.62,0.65],[0.58,0.53],[0.54,0.42],
-      [0.50,0.30],[0.52,0.20],[0.48,0.12]
+      [0.88,0.68],[0.96,0.68],[0.98,0.82],[0.90,0.85]
     ]
   ]
 };
