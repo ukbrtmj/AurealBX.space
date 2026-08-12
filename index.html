@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Domínio - Jogo de Estratégia</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&family=Roboto+Slab:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      display: flex; justify-content: center; align-items: center; min-height: 100vh;
+      background: radial-gradient(circle at center, #1e1e2f 0%, #0d0d15 100%);
+      font-family: 'Roboto Slab', serif; overflow: hidden; position: relative;
+    }
+    body::before {
+      content: ''; position: absolute; width: 350px; height: 350px;
+      background: rgba(255, 215, 0, 0.06); filter: blur(120px); border-radius: 50%; z-index: 0;
+    }
+
+    #homeScreen { width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; position: absolute; inset: 0; z-index: 1; }
+    .container { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 20px; width: 100%; }
+    
+    .logo {
+      max-width: 420px; width: 90%; height: auto; margin-bottom: 50px;
+      filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+      transition: transform 0.3s ease; user-select: none; -webkit-user-drag: none; pointer-events: none;
+    }
+
+    .button-group { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 300px; }
+    .btn {
+      font-family: 'Roboto Slab', serif; font-weight: 700; font-size: 1.3rem; color: #000000;
+      background-color: #FFD700; border: 3px solid #000000; padding: 14px 24px; border-radius: 12px;
+      text-decoration: none; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0px 6px 0px #000000;
+      transition: all 0.15s ease; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center;
+    }
+    .btn:hover { background-color: #FFE033; transform: translateY(-2px); box-shadow: 0px 8px 0px #000000; }
+    .btn:active { transform: translateY(4px); box-shadow: 0px 2px 0px #000000; }
+
+    .overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center;
+      opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease; z-index: 100;
+    }
+    .overlay.active { opacity: 1; visibility: visible; }
+    .modal {
+      background-color: #1a1a24; border: 3px solid #FFD700; border-radius: 16px; padding: 25px;
+      width: 90%; max-width: 440px; text-align: center; box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.7);
+      transform: scale(0.8); transition: transform 0.3s ease; display: flex; flex-direction: column; align-items: center;
+    }
+    .overlay.active .modal { transform: scale(1); }
+    .modal h2 { color: #FFFFFF; font-size: 1.6rem; margin-bottom: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* LAYOUT DO HEADER DO HOST: Botão abaixo do Código */
+    .host-header {
+      width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px;
+      margin-bottom: 20px; background-color: #0d0d15; padding: 14px; border-radius: 10px; border: 2px solid #333344;
+    }
+    .code-container { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .code-label { font-size: 0.7rem; color: #888899; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .code-box { display: flex; align-items: center; gap: 8px; }
+    .code-display { font-size: 1.4rem; font-weight: 900; color: #FFD700; letter-spacing: 2px; }
+    .btn-icon { background: none; border: none; color: #FFD700; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; }
+    .btn-icon i { width: 18px; height: 18px; }
+
+    .btn-config {
+      width: 100%; font-size: 0.85rem; padding: 8px 12px; border-radius: 8px;
+      border-width: 2px; box-shadow: none; gap: 8px; margin-top: 4px;
+    }
+    .btn-config i { width: 16px; height: 16px; }
+
+    .avatar-upload { position: relative; margin-bottom: 20px; cursor: pointer; }
+    .avatar-preview {
+      width: 90px; height: 90px; border-radius: 50%; border: 3px solid #FFD700; background-color: #0d0d15;
+      color: #FFD700; display: flex; justify-content: center; align-items: center; font-size: 2.5rem; font-weight: 900;
+      overflow: hidden; background-size: cover; background-position: center; box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5); transition: transform 0.2s ease;
+    }
+    .avatar-badge {
+      position: absolute; bottom: 0; right: 0; background-color: #FFD700; color: #000; border-radius: 50%;
+      width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; border: 2px solid #000;
+    }
+    .avatar-badge i { width: 14px; height: 14px; }
+    #uploadFoto { display: none; }
+
+    .modal input[type="text"], .modal select {
+      width: 100%; padding: 14px 16px; font-family: 'Roboto Slab', serif; font-size: 1rem; background-color: #0d0d15;
+      color: #FFFFFF; border: 2px solid #FFD700; border-radius: 8px; outline: none; margin-bottom: 24px; text-align: center; letter-spacing: 1px;
+    }
+    .modal-actions { display: flex; gap: 12px; width: 100%; }
+    .modal-actions .btn { flex: 1; font-size: 1rem; }
+    .btn-secondary { background-color: #333344; color: #FFFFFF; border: 3px solid #000000; }
+    .btn-secondary:hover { background-color: #444455; }
+
+    .options-section { width: 100%; display: flex; flex-direction: column; gap: 16px; }
+    .btn-menu { width: 100%; font-size: 1.1rem; }
+
+    .players-list-title { color: #9999aa; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; align-self: flex-start; }
+    .players-list { width: 100%; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .player-card { display: flex; align-items: center; gap: 12px; background-color: #0d0d15; padding: 8px 12px; border-radius: 8px; border: 1px solid #2a2a38; }
+    .player-avatar {
+      width: 38px; height: 38px; border-radius: 50%; border: 2px solid #FFD700; background-color: #1a1a24;
+      color: #FFD700; display: flex; justify-content: center; align-items: center; font-weight: 700; background-size: cover; background-position: center;
+    }
+    .player-name { color: #FFFFFF; font-weight: 700; font-size: 1rem; flex: 1; text-align: left; display: flex; align-items: center; gap: 6px; }
+    .crown-icon { color: #FFD700; width: 16px; height: 16px; }
+
+    /* HUD e Canvas */
+    #hud { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10; width: 90%; max-width: 600px; display: none; }
+    #bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #334155; margin-bottom: 8px; }
+    #controls { display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 14px; }
+    #legend { display: flex; gap: 15px; }
+    .ldot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    #canvasWrap { width: 100vw; height: 100vh; display: none; justify-content: center; align-items: center; position: relative; }
+    canvas { display: block; touch-action: none; }
+  </style>
+</head>
+<body>
+
+  <div id="homeScreen">
+    <div class="container">
+      <img src="https://file.garden/anP6_SXXiQfEPX26/file_000000000c14820e9f74ff8e3421f51c.png" alt="Logo" class="logo" oncontextmenu="return false;" draggable="false">
+      <div class="button-group">
+        <button class="btn" id="btnOnline">Online</button>
+        <button class="btn" id="btnLocal">Local</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupNome">
+    <div class="modal">
+      <h2>Coloque seu Nome</h2>
+      <label for="uploadFoto" class="avatar-upload" title="Escolha uma foto">
+        <div class="avatar-preview" id="avatarPreview">?</div>
+        <div class="avatar-badge"><i data-lucide="camera"></i></div>
+      </label>
+      <input type="file" id="uploadFoto" accept="image/*">
+      <input type="text" id="nomeUsuario" placeholder="Digite seu nome..." autocomplete="off" maxlength="15">
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnCancelarNome">Cancelar</button>
+        <button class="btn" id="btnConfirmarNome">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupOpcoes">
+    <div class="modal">
+      <h2>Modo de Jogo</h2>
+      <div class="options-section">
+        <button class="btn btn-menu btn-secondary" id="btnAbrirCodigo">Colocar Código</button>
+        <button class="btn btn-menu" id="btnHost">Host</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupCodigo">
+    <div class="modal">
+      <h2>Digite o Código</h2>
+      <input type="text" id="inputCodigoSala" placeholder="EX: A1B2C" autocomplete="off" maxlength="5" style="text-transform: uppercase;">
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnVoltarCodigo">Voltar</button>
+        <button class="btn" id="btnEntrarCodigo">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupHost">
+    <div class="modal">
+      <div class="host-header">
+        <div class="code-container">
+          <span class="code-label">Código da Sala</span>
+          <div class="code-box">
+            <span class="code-display" id="codigoDisplay">*****</span>
+            <button class="btn-icon" id="btnToggleCodigo" title="Mostrar/Ocultar Código"><i data-lucide="eye" id="iconEye"></i></button>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-config" id="btnConfigSala">
+          <i data-lucide="settings"></i> Configurações da Sala
+        </button>
+      </div>
+
+      <h2>Sala de Espera</h2>
+      <span class="players-list-title">Jogadores Conectados</span>
+      <div class="players-list" id="listaJogadores"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnSairHost">Sair</button>
+        <button class="btn" id="btnIniciarPartida">Iniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupConfig">
+    <div class="modal">
+      <h2>Configurações</h2>
+      
+      <label style="color: #888899; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; align-self: flex-start; font-weight: 700;">Escolha o Mapa</label>
+      <select id="selectMapa">
+        <option value="AFRICA">África</option>
+      </select>
+
+      <div class="modal-actions">
+        <button class="btn" id="btnSalvarConfig">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="bar"></div>
+    <div id="controls">
+      <div id="legend">
+        <span><i class="ldot" style="background:#2563eb"></i>Você</span>
+        <span><i class="ldot" style="background:#64748b"></i>Neutro</span>
+      </div>
+      <button id="restartBtn" class="btn" style="font-size: 12px; padding: 6px 12px; border-radius: 8px; background: #FFD700; color: #000; border: 2px solid #000; cursor: pointer;">Reiniciar</button>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <canvas id="game"></canvas>
+  </div>
+
+  <script src="maps/africa.js"></script>
+  <script src="api/entities.js"></script>
+
+  <script>
+    const homeScreen = document.getElementById('homeScreen');
+    const popupNome = document.getElementById('popupNome');
+    const popupOpcoes = document.getElementById('popupOpcoes');
+    const popupCodigo = document.getElementById('popupCodigo');
+    const popupHost = document.getElementById('popupHost');
+    const popupConfig = document.getElementById('popupConfig');
+
+    const btnOnline = document.getElementById('btnOnline');
+    const btnLocal = document.getElementById('btnLocal');
+    const btnCancelarNome = document.getElementById('btnCancelarNome');
+    const btnConfirmarNome = document.getElementById('btnConfirmarNome');
+    const btnAbrirCodigo = document.getElementById('btnAbrirCodigo');
+    const btnVoltarCodigo = document.getElementById('btnVoltarCodigo');
+    const btnEntrarCodigo = document.getElementById('btnEntrarCodigo');
+    const btnHost = document.getElementById('btnHost');
+    const btnToggleCodigo = document.getElementById('btnToggleCodigo');
+    const btnConfigSala = document.getElementById('btnConfigSala');
+    const btnSalvarConfig = document.getElementById('btnSalvarConfig');
+    const btnSairHost = document.getElementById('btnSairHost');
+    const btnIniciarPartida = document.getElementById('btnIniciarPartida');
+
+    const inputNome = document.getElementById('nomeUsuario');
+    const inputFoto = document.getElementById('uploadFoto');
+    const avatarPreview = document.getElementById('avatarPreview');
+    const inputCodigoSala = document.getElementById('inputCodigoSala');
+    const codigoDisplay = document.getElementById('codigoDisplay');
+    const listaJogadores = document.getElementById('listaJogadores');
+    const selectMapa = document.getElementById('selectMapa');
+
+    let fotoPersonalizada = false;
+    let urlFotoPerfil = null;
+    let nomeJogadorLocal = '';
+    let codigoSalaAtual = '';
+    let codigoVisivel = false;
+    let isHost = false;
+    let meuIndexJogador = 1;
+
+    let peer = null;
+    let conexoesCliente = [];
+    let conexaoHost = null;
+    let listaJogadoresData = [];
+
+    const peerConfig = {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
+    };
+
+    lucide.createIcons();
+
+    function gerarCodigoRandomico() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let res = '';
+      for (let i = 0; i < 5; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+      return res;
+    }
+
+    function renderizarListaJogadores(jogadores) {
+      listaJogadores.innerHTML = '';
+      jogadores.forEach((j, index) => {
+        const card = document.createElement('div');
+        card.className = 'player-card';
+
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'player-avatar';
+        if (j.foto) avatarDiv.style.backgroundImage = `url('${j.foto}')`;
+        else avatarDiv.textContent = j.nome ? j.nome.charAt(0).toUpperCase() : '?';
+
+        const playerColor = CURRENT_MAP.colors[index + 1] || '#FFD700';
+        avatarDiv.style.borderColor = playerColor;
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'player-name';
+        nameDiv.innerHTML = `${j.nome} ${j.isHost ? '<i data-lucide="crown" class="crown-icon"></i>' : ''}`;
+
+        card.appendChild(avatarDiv);
+        card.appendChild(nameDiv);
+        listaJogadores.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function atualizarDisplayCodigo() {
+      const iconEye = document.getElementById('iconEye');
+      if (codigoVisivel) {
+        codigoDisplay.textContent = codigoSalaAtual;
+        iconEye.setAttribute('data-lucide', 'eye-off');
+      } else {
+        codigoDisplay.textContent = '*****';
+        iconEye.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    }
+
+    // Modo Local
+    btnLocal.addEventListener('click', () => {
+      iniciarTelaJogo();
+    });
+
+    btnOnline.addEventListener('click', () => { popupNome.classList.add('active'); inputNome.focus(); });
+    btnCancelarNome.addEventListener('click', () => popupNome.classList.remove('active'));
+
+    inputNome.addEventListener('input', () => {
+      if (!fotoPersonalizada) {
+        const txt = inputNome.value.trim();
+        avatarPreview.textContent = txt ? txt.charAt(0).toUpperCase() : '?';
+      }
+    });
+
+    inputFoto.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          urlFotoPerfil = evt.target.result;
+          avatarPreview.style.backgroundImage = `url('${urlFotoPerfil}')`;
+          avatarPreview.textContent = '';
+          fotoPersonalizada = true;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    btnConfirmarNome.addEventListener('click', () => {
+      const nome = inputNome.value.trim();
+      if (nome) {
+        nomeJogadorLocal = nome;
+        popupNome.classList.remove('active');
+        setTimeout(() => popupOpcoes.classList.add('active'), 200);
+      } else {
+        alert('Por favor, digite seu nome.');
+      }
+    });
+
+    btnAbrirCodigo.addEventListener('click', () => {
+      popupOpcoes.classList.remove('active');
+      setTimeout(() => { popupCodigo.classList.add('active'); inputCodigoSala.focus(); }, 200);
+    });
+
+    btnVoltarCodigo.addEventListener('click', () => {
+      popupCodigo.classList.remove('active');
+      setTimeout(() => popupOpcoes.classList.add('active'), 200);
+    });
+
+    // Modal Configurações
+    btnConfigSala.addEventListener('click', () => {
+      popupConfig.classList.add('active');
+    });
+
+    btnSalvarConfig.addEventListener('click', () => {
+      popupConfig.classList.remove('active');
+    });
+
+    // HOST
+    btnHost.addEventListener('click', () => {
+      isHost = true;
+      meuIndexJogador = 1;
+      codigoSalaAtual = gerarCodigoRandomico();
+
+      peer = new Peer('DOMINIO_' + codigoSalaAtual, peerConfig);
+
+      peer.on('open', () => {
+        codigoVisivel = false;
+        atualizarDisplayCodigo();
+
+        listaJogadoresData = [{
+          id: peer.id,
+          nome: nomeJogadorLocal,
+          foto: urlFotoPerfil,
+          isHost: true,
+          playerIndex: 1
+        }];
+
+        renderizarListaJogadores(listaJogadoresData);
+        popupOpcoes.classList.remove('active');
+        setTimeout(() => popupHost.classList.add('active'), 200);
+      });
+
+      peer.on('connection', (conn) => {
+        if (listaJogadoresData.length >= 6) {
+          conn.send({ tipo: 'ERRO', msg: 'Sala Cheia! (Máximo 6 jogadores)' });
+          return;
+        }
+
+        conexoesCliente.push(conn);
+
+        conn.on('data', (data) => {
+          if (data.tipo === 'ENTRAR') {
+            const novoIndex = listaJogadoresData.length + 1;
+            listaJogadoresData.push({
+              id: conn.peer,
+              nome: data.nome,
+              foto: data.foto,
+              isHost: false,
+              playerIndex: novoIndex
+            });
+
+            conn.send({ tipo: 'SEU_INDEX', playerIndex: novoIndex });
+
+            transmitirParaTodos({
+              tipo: 'ATUALIZAR_LISTA',
+              jogadores: listaJogadoresData
+            });
+
+            renderizarListaJogadores(listaJogadoresData);
+          } else if (data.tipo === 'ENVIAR_TROPAS') {
+            if (typeof sendTroops === 'function') sendTroops(data.fromId, data.toId);
+          }
+        });
+
+        conn.on('close', () => {
+          listaJogadoresData = listaJogadoresData.filter(j => j.id !== conn.peer);
+          transmitirParaTodos({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
+          renderizarListaJogadores(listaJogadoresData);
+        });
+      });
+    });
+
+    function transmitirParaTodos(msg) {
+      conexoesCliente.forEach(c => { if (c.open) c.send(msg); });
+    }
+
+    btnEntrarCodigo.addEventListener('click', () => {
+      const cod = inputCodigoSala.value.trim().toUpperCase();
+      if (cod.length !== 5) { alert('Digite um código de 5 dígitos.'); return; }
+
+      isHost = false;
+      codigoSalaAtual = cod;
+      peer = new Peer(peerConfig);
+
+      peer.on('open', () => {
+        conexaoHost = peer.connect('DOMINIO_' + cod);
+
+        conexaoHost.on('open', () => {
+          conexaoHost.send({ tipo: 'ENTRAR', nome: nomeJogadorLocal, foto: urlFotoPerfil });
+          popupCodigo.classList.remove('active');
+          btnIniciarPartida.style.display = 'none';
+          setTimeout(() => popupHost.classList.add('active'), 200);
+        });
+
+        conexaoHost.on('data', (data) => {
+          if (data.tipo === 'ATUALIZAR_LISTA') renderizarListaJogadores(data.jogadores);
+          else if (data.tipo === 'SEU_INDEX') meuIndexJogador = data.playerIndex;
+          else if (data.tipo === 'INICIAR_PARTIDA') iniciarTelaJogo();
+          else if (data.tipo === 'SYNC_STATE') {
+            if (typeof state !== 'undefined' && state.territories) {
+              data.territories.forEach((t, i) => {
+                if (state.territories[i]) {
+                  state.territories[i].owner = t.owner;
+                  state.territories[i].troops = t.troops;
+                }
+              });
+            }
+          }
+          else if (data.tipo === 'ERRO') alert(data.msg);
+        });
+      });
+    });
+
+    btnIniciarPartida.addEventListener('click', () => {
+      if (isHost) {
+        transmitirParaTodos({ tipo: 'INICIAR_PARTIDA' });
+        iniciarTelaJogo();
+      }
+    });
+
+    function iniciarTelaJogo() {
+      popupHost.classList.remove('active');
+      homeScreen.style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+      document.getElementById('canvasWrap').style.display = 'flex';
+
+      if (typeof resize === 'function') resize();
+      if (typeof initGame === 'function') initGame();
+    }
+
+    btnToggleCodigo.addEventListener('click', () => {
+      codigoVisivel = !codigoVisivel;
+      atualizarDisplayCodigo();
+    });
+
+    btnSairHost.addEventListener('click', () => {
+      if (peer) peer.destroy();
+      popupHost.classList.remove('active');
+      setTimeout(() => popupOpcoes.classList.add('active'), 200);
+    });
+
+    [popupNome, popupOpcoes, popupCodigo, popupHost, popupConfig].forEach(modal => {
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+    });
+  </script>
+
+  <script src="api/game.js"></script>
+</body>
+</html>
