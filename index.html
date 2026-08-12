@@ -319,6 +319,15 @@
 
           conn.on('data', (data) => {
             if (data.tipo === 'ENTRAR') {
+              const jaExiste = listaJogadoresData.find(j => j.id === conn.peer);
+              if (jaExiste) {
+                // Mesmo peer mandou ENTRAR de novo (duplo clique, reconexão, etc.)
+                // Não duplica: só reenvia o índice dele e a lista atual.
+                conn.send({ tipo: 'SEU_INDEX', playerIndex: jaExiste.playerIndex });
+                conn.send({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
+                return;
+              }
+
               const novoIndex = listaJogadoresData.length + 1;
               listaJogadoresData.push({
                 id: conn.peer,
@@ -364,15 +373,34 @@
     btnEntrarCodigo.addEventListener('click', () => {
       const cod = inputCodigoSala.value.trim().toUpperCase();
       if (cod.length !== 5) { alert('Digite um código de 5 dígitos.'); return; }
+      if (btnEntrarCodigo.disabled) return; // evita clique duplo criando 2 conexões
+      btnEntrarCodigo.disabled = true;
 
       isHost = false;
       codigoSalaAtual = cod;
       peer = new Peer(peerConfig);
 
+      let entrouNaSala = false;
+      const timeoutConexao = setTimeout(() => {
+        if (!entrouNaSala) {
+          alert('Não foi possível conectar à sala. Verifique o código e sua internet.');
+          btnEntrarCodigo.disabled = false;
+        }
+      }, 10000);
+
+      peer.on('error', (err) => {
+        console.error(err);
+        clearTimeout(timeoutConexao);
+        alert('Erro ao conectar: ' + err.type);
+        btnEntrarCodigo.disabled = false;
+      });
+
       peer.on('open', () => {
         conexaoHost = peer.connect('DOMINIO_' + cod);
 
         conexaoHost.on('open', () => {
+          entrouNaSala = true;
+          clearTimeout(timeoutConexao);
           conexaoHost.send({ tipo: 'ENTRAR', nome: nomeJogadorLocal || 'Jogador', foto: urlFotoPerfil });
           popupCodigo.classList.remove('active');
           btnIniciarPartida.style.display = 'none';
@@ -393,7 +421,10 @@
               });
             }
           }
-          else if (data.tipo === 'ERRO') alert(data.msg);
+          else if (data.tipo === 'ERRO') {
+            alert(data.msg);
+            btnEntrarCodigo.disabled = false;
+          }
         });
       });
     });
@@ -413,6 +444,7 @@
 
       if (typeof resize === 'function') resize();
       if (typeof initGame === 'function') initGame();
+      if (typeof startGameLoop === 'function') startGameLoop();
     }
 
     btnToggleCodigo.addEventListener('click', () => {
