@@ -1,4 +1,4 @@
-// Referências ao Canvas principal e de buffer offline
+// Referências ao Canvas principal e buffer offline
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const wrap = document.getElementById('canvasWrap');
@@ -27,7 +27,6 @@ const TROOP_SPEED = 60;
 const MIN_DURATION = 1.2;
 const MAX_DURATION = 8.0;
 
-// Redimensiona o Canvas e reconstrói as superfícies de desenho
 function resize() {
   dpr = window.devicePixelRatio || 1;
   cssWidth = wrap.clientWidth;
@@ -103,12 +102,25 @@ function initGame() {
   const points = CURRENT_MAP.countryDefs.map(c => toCanvas(c.nx, c.ny));
   
   const territories = CURRENT_MAP.countryDefs.map((c, i) => new Territory(i, c.code, points[i].x, points[i].y));
-
   state = { territories };
 
-  const startIdx = CURRENT_MAP.startTerritoryIndex || 0;
-  territories[startIdx].owner = 1;
-  territories[startIdx].troops = 37;
+  // Se for o Host, distribui territórios entre os jogadores conectados (1 a N)
+  if (typeof isHost !== 'undefined' && isHost) {
+    const numJogadores = (typeof listaJogadoresData !== 'undefined' && listaJogadoresData.length > 0) ? listaJogadoresData.length : 1;
+    
+    // Distribuição inicial dos países entre os jogadores conectados
+    territories.forEach((t, index) => {
+      if (index < numJogadores * 2) { 
+        t.owner = (index % numJogadores) + 1;
+        t.troops = 25;
+      } else {
+        t.owner = 0; // Neutro
+        t.troops = 15;
+      }
+    });
+
+    transmitirEstadoGame();
+  }
 
   moves = []; 
   hitParticles = []; 
@@ -119,10 +131,6 @@ function initGame() {
 
   document.getElementById('overlay').style.display = 'none';
   updateScores();
-
-  if (typeof isHost !== 'undefined' && isHost) {
-    transmitirEstadoGame();
-  }
 }
 
 // Sincronização P2P: Envia dados do mapa para todos
@@ -143,35 +151,27 @@ function transmitirEstadoGame() {
 
 function updateScores() {
   if (!state || !state.territories) return;
-  const count = state.territories.filter(t => t.owner === 1).length;
-  const total = state.territories.length;
   const bar = document.getElementById('bar');
   if (!bar) return;
   
   bar.innerHTML = '';
-  
-  const pSeg = document.createElement('div');
-  pSeg.style.width = (count / total * 100) + '%';
-  pSeg.style.background = CURRENT_MAP.colors[1];
-  bar.appendChild(pSeg);
+  const total = state.territories.length;
 
-  const nSeg = document.createElement('div');
-  nSeg.style.width = ((total - count) / total * 100) + '%';
-  nSeg.style.background = CURRENT_MAP.colors[0];
-  bar.appendChild(nSeg);
+  // Renderiza no HUD a barra proporcional de cada cor/jogador presente no mapa
+  Object.keys(CURRENT_MAP.colors).forEach(ownerId => {
+    const id = parseInt(ownerId);
+    if (id === 0) return; // Ignora o neutro na barra do HUD
 
-  if (running && count === total) endGame(true);
-  else if (running && count === 0) endGame(false);
+    const count = state.territories.filter(t => t.owner === id).length;
+    if (count > 0) {
+      const seg = document.createElement('div');
+      seg.style.width = (count / total * 100) + '%';
+      seg.style.background = CURRENT_MAP.colors[id];
+      bar.appendChild(seg);
+    }
+  });
 }
 
-function endGame(won) {
-  running = false;
-  document.getElementById('overlay').style.display = 'flex';
-  document.getElementById('overlayTitle').textContent = won ? 'Mapa Dominado!' : 'Derrota!';
-  document.getElementById('overlaySub').textContent = won ? 'Você dominou todos os territórios.' : 'Você perdeu seus territórios.';
-}
-
-// Lógica de Envio de Tropas
 function sendTroops(fromId, toId) {
   const from = state.territories[fromId];
   const to = state.territories[toId];
@@ -236,7 +236,7 @@ function resolveArrival(m) {
 
 function growthTick() {
   for (const t of state.territories) {
-    if (t.owner === 1) t.troops += 1;
+    if (t.owner > 0) t.troops += 1; // Todos os territórios ocupados ganham +1 tropa
   }
   if (typeof isHost !== 'undefined' && isHost) {
     transmitirEstadoGame();
@@ -258,12 +258,15 @@ function getPos(e) {
   return { x: src.clientX - rect.left, y: src.clientY - rect.top };
 }
 
-// Eventos de Entrada / Toque do Jogador
+// Permite controlar APENAS as tropas da cor do jogador local
 function onDown(e) {
   if (!running) return;
   const p = getPos(e);
   const t = territoryAt(p.x, p.y);
-  if (t && t.owner === 1 && t.troops > 0) { 
+  
+  const meuIndex = (typeof meuIndexJogador !== 'undefined') ? meuIndexJogador : 1;
+
+  if (t && t.owner === meuIndex && t.troops > 0) { 
     selected = t; 
     dragPos = p; 
     e.preventDefault(); 
@@ -284,10 +287,8 @@ function onUp(e) {
 
   if (t && t.id !== selected.id) {
     if (typeof isHost === 'undefined' || isHost) {
-      // Se for Host ou jogo Local, executa diretamente
       sendTroops(selected.id, t.id);
     } else if (typeof conexaoHost !== 'undefined' && conexaoHost && conexaoHost.open) {
-      // Se for Cliente, solicita a ao Host
       conexaoHost.send({
         tipo: 'ENVIAR_TROPAS',
         fromId: selected.id,
@@ -312,7 +313,7 @@ if (restartBtn) restartBtn.addEventListener('click', initGame);
 const overlayBtn = document.getElementById('overlayBtn');
 if (overlayBtn) overlayBtn.addEventListener('click', initGame);
 
-// Loop Principal de Atualizao e Renderizao (60 FPS)
+// Loop Principal de Renderização
 let lastTime = performance.now();
 
 function loop(now) {
@@ -320,7 +321,6 @@ function loop(now) {
   lastTime = now;
 
   if (running) {
-    // Apenas o Host faz o tick de ganho automático
     if (typeof isHost === 'undefined' || isHost) {
       lastGrowth += dt;
       if (lastGrowth > 1.5) { 
@@ -371,7 +371,6 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-// Renderiza a Interface e o Mapa no Canvas
 function render() {
   ctx.save();
   ctx.scale(dpr, dpr);
@@ -386,7 +385,6 @@ function render() {
   offCtx.scale(dpr, dpr);
   offCtx.clearRect(0, 0, cssWidth, cssHeight);
 
-  // Desenha Células de Voronoi dos Territórios
   for (const t of state.territories) {
     const poly = voronoi.cellPolygon(t.id);
     if (!poly) continue;
@@ -408,7 +406,6 @@ function render() {
     }
   }
 
-  // Aplica a Máscara das Massas de Terra (Continentes)
   offCtx.globalCompositeOperation = 'destination-in';
   offCtx.drawImage(maskCanvas, 0, 0, cssWidth, cssHeight);
   offCtx.globalCompositeOperation = 'source-over';
@@ -416,7 +413,6 @@ function render() {
 
   ctx.drawImage(offCanvas, 0, 0, cssWidth, cssHeight);
 
-  // Linha Guia de Mira ao Arrastar
   if (selected && dragPos) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 2;
@@ -428,7 +424,6 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Desenha as Tropas em Trânsito (Bolinhas)
   for (const m of moves) {
     if (m.delay > 0) continue;
 
@@ -455,11 +450,10 @@ function render() {
 
     ctx.beginPath();
     ctx.arc(finalX, finalY, 5.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e3a8a';
+    ctx.fillStyle = CURRENT_MAP.colors[m.owner] || '#1e3a8a';
     ctx.fill();
   }
 
-  // Partículas de Impacto
   for (const p of hitParticles) {
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -469,7 +463,6 @@ function render() {
     ctx.globalAlpha = 1.0;
   }
 
-  // Circulos dos Territórios e Valores de Tropas
   for (const t of state.territories) {
     if (t.pulseAnim > 0) {
       const waveRadius = 17 + (1 - t.pulseAnim) * 28;
@@ -490,7 +483,7 @@ function render() {
     ctx.arc(t.x, t.y, radius, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
-    ctx.strokeStyle = t.owner === 1 ? '#2563eb' : '#64748b';
+    ctx.strokeStyle = CURRENT_MAP.colors[t.owner] || '#64748b';
     ctx.lineWidth = 2 + (t.impactAnim * 2) + (t.pulseAnim * 2);
     ctx.stroke();
 
@@ -504,5 +497,4 @@ function render() {
   ctx.restore();
 }
 
-// Inicia o Loop principal do Canvas
 requestAnimationFrame(loop);
