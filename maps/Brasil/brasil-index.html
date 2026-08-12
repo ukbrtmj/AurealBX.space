@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Domínio - Brasil</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&family=Roboto+Slab:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/style.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      display: flex; justify-content: center; align-items: center; min-height: 100vh;
+      background: radial-gradient(circle at center, #1e1e2f 0%, #0d0d15 100%);
+      font-family: 'Roboto Slab', serif; overflow: hidden; position: relative;
+    }
+    #hud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10; width: 90%; max-width: 600px; }
+    #bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #334155; margin-bottom: 8px; }
+    #controls { display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 14px; }
+    #legend { display: flex; gap: 15px; }
+    .ldot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+    #canvasWrap { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <div id="hud">
+    <div id="bar"></div>
+    <div id="controls">
+      <div id="legend">
+        <span><i class="ldot" style="background:#2563eb"></i>Você</span>
+        <span><i class="ldot" style="background:#64748b"></i>Neutro</span>
+      </div>
+      <button id="restartBtn" class="btn" style="font-size: 12px; padding: 6px 12px; border-radius: 8px; background: #FFD700; color: #000; border: 2px solid #000; cursor: pointer;">Reiniciar</button>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <canvas id="game"></canvas>
+  </div>
+
+  <script src="brasil.js"></script>
+  <script src="/js/entities.js"></script>
+  <script src="/js/game.js"></script>
+</body>
+</html>
