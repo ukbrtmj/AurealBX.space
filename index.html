@@ -97,6 +97,7 @@
       <label style="color: #888899; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; align-self: flex-start; font-weight: 700;">Escolha o Mapa</label>
       <select id="selectMapa">
         <option value="AFRICA">África</option>
+        <option value="ARQUIPELAGO">Arquipélago</option>
       </select>
 
       <div class="modal-actions">
@@ -109,6 +110,10 @@
     <div class="countdown-content">
       <span class="countdown-label">A partida começa em</span>
       <div class="countdown-ring">
+        <svg class="countdown-ring-svg" viewBox="0 0 160 160">
+          <circle class="countdown-ring-bg" cx="80" cy="80" r="70"></circle>
+          <circle class="countdown-ring-progress" id="countdownRingProgress" cx="80" cy="80" r="70"></circle>
+        </svg>
         <div class="countdown-number" id="countdownNumber">5</div>
       </div>
     </div>
@@ -125,6 +130,7 @@
   </div>
 
   <script src="maps/Africa/africa.js"></script>
+  <script src="maps/Arquipelago/arquipelago.js"></script>
   <script src="js/entities.js"></script>
 
   <script>
@@ -147,6 +153,7 @@
     const btnToggleCodigo = document.getElementById('btnToggleCodigo');
     const btnConfigSala = document.getElementById('btnConfigSala');
     const btnSalvarConfig = document.getElementById('btnSalvarConfig');
+    const selectMapa = document.getElementById('selectMapa');
     const btnSairHost = document.getElementById('btnSairHost');
     const btnIniciarPartida = document.getElementById('btnIniciarPartida');
 
@@ -166,6 +173,7 @@
     let isHost = false;
     let meuIndexJogador = 1;
     let onlineMode = false; // true quando Host ou Cliente de uma partida online
+    let mapaSelecionado = 'AFRICA'; // mapa escolhido em "Configurações da Sala"
 
     // Instâncias de Rede
     let peer = null;
@@ -183,6 +191,30 @@
     };
 
     lucide.createIcons();
+
+    // Aplica o mapa escolhido (mapaSelecionado) como o mapa ativo do jogo.
+    // Precisa ser chamada antes de iniciar a partida, tanto no host quanto
+    // nos clientes, para todo mundo jogar no mesmo mapa.
+    function aplicarMapaSelecionado() {
+      const mapa = (window.MAPS && window.MAPS[mapaSelecionado]) || window.MAPS.AFRICA;
+      if (mapa) window.CURRENT_MAP = mapa;
+    }
+
+    // Só o host pode mexer nas configurações da sala. Para quem entrou
+    // como convidado, o botão fica escurecido, sem clique, mostrando
+    // só a coroa no lugar do texto/ícone de configurações.
+    function atualizarBotaoConfig() {
+      if (isHost) {
+        btnConfigSala.disabled = false;
+        btnConfigSala.classList.remove('btn-config-locked');
+        btnConfigSala.innerHTML = '<i data-lucide="settings"></i> Configurações da Sala';
+      } else {
+        btnConfigSala.disabled = true;
+        btnConfigSala.classList.add('btn-config-locked');
+        btnConfigSala.innerHTML = '<i data-lucide="crown"></i>';
+      }
+      lucide.createIcons();
+    }
 
     function gerarCodigoRandomico() {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -283,8 +315,22 @@
       setTimeout(() => popupOpcoes.classList.add('active'), 200);
     });
 
-    btnConfigSala.addEventListener('click', () => popupConfig.classList.add('active'));
-    btnSalvarConfig.addEventListener('click', () => popupConfig.classList.remove('active'));
+    btnConfigSala.addEventListener('click', () => {
+      if (!isHost) return; // trancado para quem não é host
+      selectMapa.value = mapaSelecionado;
+      popupConfig.classList.add('active');
+    });
+
+    btnSalvarConfig.addEventListener('click', () => {
+      mapaSelecionado = selectMapa.value;
+      aplicarMapaSelecionado();
+      popupConfig.classList.remove('active');
+
+      // Avisa todo mundo já conectado na sala qual é o mapa escolhido.
+      if (isHost && onlineMode) {
+        transmitirParaTodos({ tipo: 'CONFIG_SALA', mapa: mapaSelecionado });
+      }
+    });
 
     // ==========================================
     // CRIAÇÃO DA SALA (HOST)
@@ -316,6 +362,7 @@
           }];
 
           renderizarListaJogadores(listaJogadoresData);
+          atualizarBotaoConfig();
           popupOpcoes.classList.remove('active');
           setTimeout(() => popupHost.classList.add('active'), 200);
         });
@@ -334,7 +381,7 @@
               if (jaExiste) {
                 // Mesmo peer mandou ENTRAR de novo (duplo clique, reconexão, etc.)
                 // Não duplica: só reenvia o índice dele e a lista atual.
-                conn.send({ tipo: 'SEU_INDEX', playerIndex: jaExiste.playerIndex });
+                conn.send({ tipo: 'SEU_INDEX', playerIndex: jaExiste.playerIndex, mapa: mapaSelecionado });
                 conn.send({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
                 return;
               }
@@ -348,7 +395,7 @@
                 playerIndex: novoIndex
               });
 
-              conn.send({ tipo: 'SEU_INDEX', playerIndex: novoIndex });
+              conn.send({ tipo: 'SEU_INDEX', playerIndex: novoIndex, mapa: mapaSelecionado });
               transmitirParaTodos({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
               renderizarListaJogadores(listaJogadoresData);
             } else if (data.tipo === 'ENVIAR_TROPAS') {
@@ -427,6 +474,7 @@
           conexaoHost.send({ tipo: 'ENTRAR', nome: nomeJogadorLocal || 'Jogador', foto: urlFotoPerfil });
           popupCodigo.classList.remove('active');
           btnIniciarPartida.style.display = 'none';
+          atualizarBotaoConfig(); // convidado: botão de config fica travado
           setTimeout(() => popupHost.classList.add('active'), 200);
         });
 
@@ -435,8 +483,15 @@
             listaJogadoresData = data.jogadores;
             renderizarListaJogadores(data.jogadores);
           }
-          else if (data.tipo === 'SEU_INDEX') meuIndexJogador = data.playerIndex;
+          else if (data.tipo === 'SEU_INDEX') {
+            meuIndexJogador = data.playerIndex;
+            if (data.mapa) mapaSelecionado = data.mapa;
+          }
+          else if (data.tipo === 'CONFIG_SALA') {
+            if (data.mapa) mapaSelecionado = data.mapa;
+          }
           else if (data.tipo === 'INICIAR_PARTIDA') {
+            if (data.mapa) mapaSelecionado = data.mapa;
             popupHost.classList.remove('active');
             iniciarContagem(() => iniciarTelaJogo());
           }
@@ -453,7 +508,7 @@
 
     btnIniciarPartida.addEventListener('click', () => {
       if (isHost) {
-        transmitirParaTodos({ tipo: 'INICIAR_PARTIDA' });
+        transmitirParaTodos({ tipo: 'INICIAR_PARTIDA', mapa: mapaSelecionado });
         popupHost.classList.remove('active');
         iniciarContagem(() => iniciarTelaJogo());
       }
@@ -462,32 +517,45 @@
     // Timer de 5s exibido antes da partida começar, igual para todo mundo
     // (cada jogador roda a contagem no seu próprio dispositivo assim que
     // recebe o aviso de início, então todos veem praticamente ao mesmo tempo).
+    // O anel ao redor do número esvazia suavemente a cada segundo, e ao
+    // chegar em zero o jogo começa direto — sem nenhum texto extra piscando.
+    const COUNTDOWN_TOTAL = 5;
+    const RING_CIRCUMFERENCE = 439.8; // 2 * PI * 70 (raio do círculo no SVG)
+
     function iniciarContagem(callback) {
       const overlay = document.getElementById('popupCountdown');
       const numberEl = document.getElementById('countdownNumber');
-      let count = 5;
+      const ringEl = document.getElementById('countdownRingProgress');
+      let count = COUNTDOWN_TOTAL;
 
       overlay.classList.add('active');
-      numberEl.textContent = count;
-      numberEl.classList.remove('vai');
-      reiniciarAnimacaoNumero(numberEl);
+      atualizarNumeroContagem(numberEl, count);
+      atualizarAnelContagem(ringEl, count);
 
       const interval = setInterval(() => {
         count--;
         if (count > 0) {
-          numberEl.textContent = count;
-          reiniciarAnimacaoNumero(numberEl);
+          atualizarNumeroContagem(numberEl, count);
+          atualizarAnelContagem(ringEl, count);
         } else {
           clearInterval(interval);
-          numberEl.textContent = 'VAI!';
-          numberEl.classList.add('vai');
-          reiniciarAnimacaoNumero(numberEl);
-          setTimeout(() => {
-            overlay.classList.remove('active');
-            callback();
-          }, 550);
+          atualizarAnelContagem(ringEl, 0);
+          overlay.classList.remove('active');
+          // Pequena espera só para acompanhar o fade suave do overlay.
+          setTimeout(callback, 300);
         }
       }, 1000);
+    }
+
+    function atualizarNumeroContagem(el, count) {
+      el.textContent = count;
+      reiniciarAnimacaoNumero(el);
+    }
+
+    function atualizarAnelContagem(ringEl, count) {
+      if (!ringEl) return;
+      const progresso = count / COUNTDOWN_TOTAL;
+      ringEl.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progresso);
     }
 
     function reiniciarAnimacaoNumero(el) {
@@ -497,6 +565,8 @@
     }
 
     function iniciarTelaJogo() {
+      aplicarMapaSelecionado();
+
       popupHost.classList.remove('active');
       homeScreen.style.display = 'none';
       document.getElementById('hud').style.display = 'block';
