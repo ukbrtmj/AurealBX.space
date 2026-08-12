@@ -423,128 +423,179 @@ body::before {
   height: 16px; 
 }
 
-/* Timer de 5 Segundos */
-.countdown-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(13, 13, 21, 0.88);
-  backdrop-filter: blur(10px);
-  z-index: 100;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.countdown-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.countdown-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.countdown-title {
-  color: #94a3b8;
-  font-size: 1.2rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 10px;
-}
-
-.countdown-number {
-  font-size: 6rem;
-  font-weight: 900;
-  color: #FFD700;
-  text-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-  animation: pulseNumber 1s infinite alternate;
-}
-
-@keyframes pulseNumber {
-  from { transform: scale(0.9); }
-  to { transform: scale(1.1); }
-}
-
-/* Animação do Mapa */
-.map-appear {
-  animation: zoomFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes zoomFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.85);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-
 /* ==========================================================================
    6. INTERFACE DO JOGO (HUD E CANVAS)
    ========================================================================== */
-#hud { 
-  position: absolute; 
-  top: 12px; 
-  left: 50%; 
-  transform: translateX(-50%); 
-  z-index: 10; 
-  width: 90%; 
-  max-width: 600px; 
-  display: none; 
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 92%;
+  max-width: 640px;
+  display: none;
+  background: rgba(13, 13, 21, 0.72);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 215, 0, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0px 6px 18px rgba(0, 0, 0, 0.4);
 }
 
-#bar { 
-  display: flex; 
-  height: 12px; 
-  border-radius: 6px; 
-  overflow: hidden; 
-  background: #334155; 
-  margin-bottom: 8px; 
+#controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-size: 14px;
 }
 
-#controls { 
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  color: #fff; 
-  font-size: 14px; 
-}
-
-#legend { 
-  display: flex; 
-  gap: 15px; 
+#legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12.5px;
+  scrollbar-width: none;
 }
 
-.ldot { 
-  display: inline-block; 
-  width: 10px; 
-  height: 10px; 
-  border-radius: 50%; 
-  margin-right: 5px; 
+#legend::-webkit-scrollbar { display: none; }
+
+#legend span {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-#canvasWrap { 
-  width: 100vw; 
-  height: 100vh; 
-  display: none; 
-  justify-content: center; 
-  align-items: center; 
-  position: relative; 
+.ldot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.15);
 }
 
-canvas { 
-  display: block; 
-  touch-action: none; 
+#canvasWrap {
+  width: 100vw;
+  height: 100vh;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  opacity: 0;
+}
+
+#canvasWrap.map-reveal {
+  animation: mapReveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes mapReveal {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* ==========================================================================
+   7. CONTAGEM REGRESSIVA (INÍCIO DA PARTIDA)
+   ========================================================================== */
+#popupCountdown {
+  background-color: rgba(5, 5, 10, 0.85);
+  backdrop-filter: blur(10px);
+}
+
+.countdown-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.countdown-label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #FFD700;
+}
+
+.countdown-ring {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.25);
+}
+
+/* Anel de progresso em SVG: esvazia suavemente a cada segundo, em vez
+   de uma borda estática — deixa o timer mais claro e mais bonito. */
+.countdown-ring-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.countdown-ring-bg {
+  fill: none;
+  stroke: rgba(255, 215, 0, 0.15);
+  stroke-width: 6;
+}
+
+.countdown-ring-progress {
+  fill: none;
+  stroke: #FFD700;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 439.8;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.9s linear;
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.55));
+}
+
+.countdown-number {
+  position: relative;
+  z-index: 1;
+  font-family: 'Roboto Slab', serif;
+  font-weight: 900;
+  font-size: 4rem;
+  color: #FFFFFF;
+  animation: countdownPulse 1s ease-out;
+}
+
+@keyframes countdownPulse {
+  0% { transform: scale(1.5); opacity: 0; }
+  30% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ==========================================================================
+   8. BOTÃO "CONFIGURAÇÕES DA SALA" — TRAVADO PARA QUEM NÃO É HOST
+   ========================================================================== */
+.btn-config.btn-config-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  justify-content: center;
+}
+
+.btn-config.btn-config-locked i {
+  width: 20px;
+  height: 20px;
+  color: #FFD700;
+  margin: 0;
 }
