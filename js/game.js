@@ -58,18 +58,54 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 
+// padTop maior que padBottom: sobra espaço reservado em cima do mapa
+// para a coroa da capital nunca ser desenhada cortada/fora da tela.
+const ICON_TOP_MARGIN = 30;
+
 function computeLayout() {
-  const padTop = 6, padBottom = 6;
+  const padTop = ICON_TOP_MARGIN, padBottom = 10;
   const availH = Math.max(200, cssHeight - padTop - padBottom);
-  const availW = cssWidth - 6;
+  const availW = cssWidth - 20;
   const MAP_ASPECT = CURRENT_MAP.aspectRatio || 1.25;
   let mapH = availH, mapW = mapH * MAP_ASPECT;
   if (mapW > availW) { mapW = availW; mapH = mapW / MAP_ASPECT; }
-  layout = { mapW, mapH, offsetX: (cssWidth - mapW) / 2, offsetY: padTop };
+  layout = {
+    mapW, mapH,
+    offsetX: (cssWidth - mapW) / 2,
+    // Mapa centralizado verticalmente no espaço disponível (não gruda no topo).
+    offsetY: padTop + (availH - mapH) / 2
+  };
 }
 
 function toCanvas(nx, ny) {
   return { x: layout.offsetX + nx * layout.mapW, y: layout.offsetY + ny * layout.mapH };
+}
+
+// ==========================================
+// ÍCONE DE CAPITAL (Lucide "crown")
+// ==========================================
+// Antes usávamos o emoji 👑 (fonte do sistema, tamanho inconsistente e
+// podia "vazar" para fora do mapa perto das bordas). Agora desenhamos o
+// ícone "crown" do Lucide Icons diretamente no canvas via Path2D, do
+// mesmo jeito que o resto do site já usa os ícones Lucide.
+const CROWN_PATH = new Path2D(
+  'M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294zM5 21h14'
+);
+
+// Desenha a coroa centralizada em (x, y) com o tamanho informado (px).
+function drawCrownIcon(x, y, size, fillColor) {
+  const scale = size / 24; // viewBox original do Lucide é 24x24
+  ctx.save();
+  ctx.translate(x - size / 2, y - size / 2);
+  ctx.scale(scale, scale);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2.2 / scale;
+  ctx.fillStyle = fillColor || '#FFD700';
+  ctx.fill(CROWN_PATH);
+  ctx.strokeStyle = '#0f172a';
+  ctx.stroke(CROWN_PATH);
+  ctx.restore();
 }
 
 function buildMask() {
@@ -623,13 +659,24 @@ function render() {
     // Coroa do território principal: fica presa ao território, não ao jogador.
     // Se outro jogador conquistar essa capital, a coroa (e o bônus) passam a ser dele.
     if (t.isCapital) {
+      const iconSize = 18;
+      const half = iconSize / 2 + 2;
+
+      // Posição "ideal": acima do território. Se isso ficar fora do
+      // canvas (ou muito perto da borda), a coroa é travada dentro dos
+      // limites visíveis em vez de ser cortada.
+      let iconX = t.x;
+      let iconY = t.y - radius - 10 - iconSize / 2;
+
+      iconX = Math.min(cssWidth - half, Math.max(half, iconX));
+      iconY = Math.max(half, iconY);
+      // Nunca deixa a coroa invadir a área abaixo do território.
+      iconY = Math.min(t.y - radius - 2, iconY);
+
       ctx.save();
-      ctx.font = '14px "Plus Jakarta Sans", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 3;
-      ctx.fillText('👑', t.x, t.y - radius - 10);
+      drawCrownIcon(iconX, iconY, iconSize);
       ctx.restore();
     }
   }
