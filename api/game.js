@@ -321,7 +321,11 @@ function loop(now) {
     }
   }
 
-  render();
+  try {
+    render();
+  } catch (err) {
+    console.error('Erro ao renderizar o frame (ignorado, jogo continua):', err);
+  }
   requestAnimationFrame(loop);
 }
 
@@ -451,8 +455,11 @@ function render() {
   ctx.restore();
 }
 
-// Inicia automaticamente o mapa assim que a página é aberta
-window.addEventListener('load', () => {
-  initGame();
+// O jogo é iniciado explicitamente por iniciarTelaJogo() (em index.html),
+// só depois que a tela do jogo estiver visível e o canvas tiver um tamanho real.
+function startGameLoop() {
+  if (window.__loopStarted) return;
+  window.__loopStarted = true;
   requestAnimationFrame(loop);
-});
+}
+window.startGameLoop = startGameLoop;
