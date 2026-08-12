@@ -61,5 +61,10 @@ const MAP_AFRICA = {
   ]
 };
 
-// Define o mapa padrão global
+// Registra este mapa junto dos outros disponíveis no jogo.
+window.MAPS = window.MAPS || {};
+window.MAPS.AFRICA = MAP_AFRICA;
+
+// Define o mapa padrão global (usado até o jogador escolher outro em
+// "Configurações da Sala").
 var CURRENT_MAP = MAP_AFRICA;
