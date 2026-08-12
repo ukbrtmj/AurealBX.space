@@ -29,7 +29,7 @@
 
   <div class="overlay" id="popupNome">
     <div class="modal">
-      <h2>Coloque seu Nome</h2>
+      <h2>Personalizar seu Perfil</h2>
       <label for="uploadFoto" class="avatar-upload" title="Escolha uma foto">
         <div class="avatar-preview" id="avatarPreview">?</div>
         <div class="avatar-badge"><i data-lucide="camera"></i></div>
@@ -75,7 +75,7 @@
           </div>
         </div>
         <button class="btn btn-secondary btn-config" id="btnConfigSala">
-          <i data-lucide="settings"></i> Configurações da Sala
+          <i data-lucide="settings"></i> Configurações
         </button>
       </div>
 
@@ -93,26 +93,27 @@
   <div class="overlay" id="popupConfig">
     <div class="modal">
       <h2>Configurações</h2>
-      
       <label style="color: #888899; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; align-self: flex-start; font-weight: 700;">Escolha o Mapa</label>
       <select id="selectMapa">
-        <option value="AFRICA">África</option>
+        <option value="AFRICA">África (Até 6 Jogadores)</option>
       </select>
-
       <div class="modal-actions">
         <button class="btn" id="btnSalvarConfig">Salvar</button>
       </div>
     </div>
   </div>
 
+  <div id="countdownOverlay" class="countdown-overlay">
+    <div class="countdown-card">
+      <span class="countdown-title">A partida começará em</span>
+      <span id="countdownNumber" class="countdown-number">5</span>
+    </div>
+  </div>
+
   <div id="hud">
     <div id="bar"></div>
     <div id="controls">
-      <div id="legend">
-        <span><i class="ldot" style="background:#2563eb"></i>Você</span>
-        <span><i class="ldot" style="background:#64748b"></i>Neutro</span>
-      </div>
-      <button id="restartBtn" class="btn" style="font-size: 12px; padding: 6px 12px; border-radius: 8px; background: #FFD700; color: #000; border: 2px solid #000; cursor: pointer;">Reiniciar</button>
+      <div id="legend"></div>
     </div>
   </div>
 
@@ -120,152 +121,99 @@
     <canvas id="game"></canvas>
   </div>
 
-  <script src="maps/Africa/africa.js"></script>
   <script src="js/entities.js"></script>
+  <script src="maps/Africa/africa.js"></script>
+  <script src="js/game.js"></script>
 
   <script>
-    // Referências DOM
-    const homeScreen = document.getElementById('homeScreen');
-    const popupNome = document.getElementById('popupNome');
-    const popupOpcoes = document.getElementById('popupOpcoes');
-    const popupCodigo = document.getElementById('popupCodigo');
-    const popupHost = document.getElementById('popupHost');
-    const popupConfig = document.getElementById('popupConfig');
+    lucide.createIcons();
 
+    // Elementos DOM
+    const homeScreen = document.getElementById('homeScreen');
     const btnOnline = document.getElementById('btnOnline');
     const btnLocal = document.getElementById('btnLocal');
+    
+    const popupNome = document.getElementById('popupNome');
+    const uploadFoto = document.getElementById('uploadFoto');
+    const avatarPreview = document.getElementById('avatarPreview');
+    const nomeUsuario = document.getElementById('nomeUsuario');
     const btnCancelarNome = document.getElementById('btnCancelarNome');
     const btnConfirmarNome = document.getElementById('btnConfirmarNome');
+
+    const popupOpcoes = document.getElementById('popupOpcoes');
     const btnAbrirCodigo = document.getElementById('btnAbrirCodigo');
+    const btnHost = document.getElementById('btnHost');
+
+    const popupCodigo = document.getElementById('popupCodigo');
+    const inputCodigoSala = document.getElementById('inputCodigoSala');
     const btnVoltarCodigo = document.getElementById('btnVoltarCodigo');
     const btnEntrarCodigo = document.getElementById('btnEntrarCodigo');
-    const btnHost = document.getElementById('btnHost');
+
+    const popupHost = document.getElementById('popupHost');
+    const codigoDisplay = document.getElementById('codigoDisplay');
     const btnToggleCodigo = document.getElementById('btnToggleCodigo');
-    const btnConfigSala = document.getElementById('btnConfigSala');
-    const btnSalvarConfig = document.getElementById('btnSalvarConfig');
+    const iconEye = document.getElementById('iconEye');
+    const listaJogadores = document.getElementById('listaJogadores');
     const btnSairHost = document.getElementById('btnSairHost');
     const btnIniciarPartida = document.getElementById('btnIniciarPartida');
 
-    const inputNome = document.getElementById('nomeUsuario');
-    const inputFoto = document.getElementById('uploadFoto');
-    const avatarPreview = document.getElementById('avatarPreview');
-    const inputCodigoSala = document.getElementById('inputCodigoSala');
-    const codigoDisplay = document.getElementById('codigoDisplay');
-    const listaJogadores = document.getElementById('listaJogadores');
+    const popupConfig = document.getElementById('popupConfig');
+    const btnConfigSala = document.getElementById('btnConfigSala');
+    const btnSalvarConfig = document.getElementById('btnSalvarConfig');
 
-    // Estado Local
-    let fotoPersonalizada = false;
-    let urlFotoPerfil = null;
-    let nomeJogadorLocal = '';
-    let codigoSalaAtual = '';
-    let codigoVisivel = false;
-    let isHost = false;
-    let meuIndexJogador = 1;
-
-    // Instâncias de Rede
+    // Variáveis do Jogador e Sala
+    let me = { nome: '', foto: null };
     let peer = null;
-    let conexoesCliente = [];
+    let conexoes = [];
     let conexaoHost = null;
-    let listaJogadoresData = [];
+    let isHost = false;
+    let salaCodigo = '';
+    let codigoVisivel = false;
+    let jogadores = [];
+    let meuId = 1;
 
-    const peerConfig = {
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
-      }
-    };
-
-    lucide.createIcons();
-
-    function gerarCodigoRandomico() {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let res = '';
-      for (let i = 0; i < 5; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
-      return res;
-    }
-
-    function renderizarListaJogadores(jogadores) {
-      listaJogadores.innerHTML = '';
-      jogadores.forEach((j, index) => {
-        const card = document.createElement('div');
-        card.className = 'player-card';
-
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'player-avatar';
-        if (j.foto) avatarDiv.style.backgroundImage = `url('${j.foto}')`;
-        else avatarDiv.textContent = j.nome ? j.nome.charAt(0).toUpperCase() : '?';
-
-        const playerColor = (typeof CURRENT_MAP !== 'undefined' && CURRENT_MAP.colors && CURRENT_MAP.colors[index + 1]) 
-          ? CURRENT_MAP.colors[index + 1] 
-          : '#FFD700';
-          
-        avatarDiv.style.borderColor = playerColor;
-
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'player-name';
-        nameDiv.innerHTML = `${j.nome} ${j.isHost ? '<i data-lucide="crown" class="crown-icon"></i>' : ''}`;
-
-        card.appendChild(avatarDiv);
-        card.appendChild(nameDiv);
-        listaJogadores.appendChild(card);
-      });
-      lucide.createIcons();
-    }
-
-    function atualizarDisplayCodigo() {
-      const iconEye = document.getElementById('iconEye');
-      if (codigoVisivel) {
-        codigoDisplay.textContent = codigoSalaAtual;
-        iconEye.setAttribute('data-lucide', 'eye-off');
-      } else {
-        codigoDisplay.textContent = '*****';
-        iconEye.setAttribute('data-lucide', 'eye');
-      }
-      lucide.createIcons();
-    }
-
-    // Ações dos Modais
-    btnLocal.addEventListener('click', () => iniciarTelaJogo());
-    btnOnline.addEventListener('click', () => { popupNome.classList.add('active'); inputNome.focus(); });
-    btnCancelarNome.addEventListener('click', () => popupNome.classList.remove('active'));
-
-    inputNome.addEventListener('input', () => {
-      if (!fotoPersonalizada) {
-        const txt = inputNome.value.trim();
-        avatarPreview.textContent = txt ? txt.charAt(0).toUpperCase() : '?';
-      }
-    });
-
-    inputFoto.addEventListener('change', (e) => {
+    // Foto de Perfil
+    uploadFoto.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (evt) => {
-          urlFotoPerfil = evt.target.result;
-          avatarPreview.style.backgroundImage = `url('${urlFotoPerfil}')`;
+        reader.onload = function(evt) {
+          me.foto = evt.target.result;
+          avatarPreview.style.backgroundImage = `url(${me.foto})`;
           avatarPreview.textContent = '';
-          fotoPersonalizada = true;
         };
         reader.readAsDataURL(file);
       }
     });
 
-    btnConfirmarNome.addEventListener('click', () => {
-      const nome = inputNome.value.trim();
-      if (nome) {
-        nomeJogadorLocal = nome;
-        popupNome.classList.remove('active');
-        setTimeout(() => popupOpcoes.classList.add('active'), 200);
+    btnOnline.addEventListener('click', () => {
+      if (!me.nome) {
+        popupNome.classList.add('active');
       } else {
-        alert('Por favor, digite seu nome.');
+        popupOpcoes.classList.add('active');
       }
+    });
+
+    // Partida Solo / Local
+    btnLocal.addEventListener('click', () => {
+      if (typeof iniciarPartidaComTimer === 'function') {
+        iniciarPartidaComTimer(1, 1, []);
+      }
+    });
+
+    btnCancelarNome.addEventListener('click', () => popupNome.classList.remove('active'));
+
+    btnConfirmarNome.addEventListener('click', () => {
+      const nomeVal = nomeUsuario.value.trim();
+      if (!nomeVal) return alert('Por favor, digite seu nome!');
+      me.nome = nomeVal;
+      popupNome.classList.remove('active');
+      setTimeout(() => popupOpcoes.classList.add('active'), 200);
     });
 
     btnAbrirCodigo.addEventListener('click', () => {
       popupOpcoes.classList.remove('active');
-      setTimeout(() => { popupCodigo.classList.add('active'); inputCodigoSala.focus(); }, 200);
+      setTimeout(() => popupCodigo.classList.add('active'), 200);
     });
 
     btnVoltarCodigo.addEventListener('click', () => {
@@ -273,178 +221,139 @@
       setTimeout(() => popupOpcoes.classList.add('active'), 200);
     });
 
-    btnConfigSala.addEventListener('click', () => popupConfig.classList.add('active'));
-    btnSalvarConfig.addEventListener('click', () => popupConfig.classList.remove('active'));
-
-    // ==========================================
-    // CRIAÇÃO DA SALA (HOST)
-    // ==========================================
-    btnHost.addEventListener('click', () => {
-      if (typeof Peer === 'undefined') {
-        alert('Erro: A biblioteca PeerJS não carregou. Verifique sua conexão.');
-        return;
-      }
-
-      try {
-        isHost = true;
-        meuIndexJogador = 1;
-        codigoSalaAtual = gerarCodigoRandomico();
-
-        peer = new Peer('DOMINIO_' + codigoSalaAtual, peerConfig);
-
-        peer.on('open', () => {
-          codigoVisivel = false;
-          atualizarDisplayCodigo();
-
-          listaJogadoresData = [{
-            id: peer.id,
-            nome: nomeJogadorLocal || 'Host',
-            foto: urlFotoPerfil,
-            isHost: true,
-            playerIndex: 1
-          }];
-
-          renderizarListaJogadores(listaJogadoresData);
-          popupOpcoes.classList.remove('active');
-          setTimeout(() => popupHost.classList.add('active'), 200);
-        });
-
-        peer.on('connection', (conn) => {
-          if (listaJogadoresData.length >= 6) {
-            conn.send({ tipo: 'ERRO', msg: 'Sala Cheia! (Máximo 6 jogadores)' });
-            return;
-          }
-
-          conexoesCliente.push(conn);
-
-          conn.on('data', (data) => {
-            if (data.tipo === 'ENTRAR') {
-              const jaExiste = listaJogadoresData.find(j => j.id === conn.peer);
-              if (jaExiste) {
-                // Mesmo peer mandou ENTRAR de novo (duplo clique, reconexão, etc.)
-                // Não duplica: só reenvia o índice dele e a lista atual.
-                conn.send({ tipo: 'SEU_INDEX', playerIndex: jaExiste.playerIndex });
-                conn.send({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
-                return;
-              }
-
-              const novoIndex = listaJogadoresData.length + 1;
-              listaJogadoresData.push({
-                id: conn.peer,
-                nome: data.nome,
-                foto: data.foto,
-                isHost: false,
-                playerIndex: novoIndex
-              });
-
-              conn.send({ tipo: 'SEU_INDEX', playerIndex: novoIndex });
-              transmitirParaTodos({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
-              renderizarListaJogadores(listaJogadoresData);
-            } else if (data.tipo === 'ENVIAR_TROPAS') {
-              if (typeof sendTroops === 'function') sendTroops(data.fromId, data.toId);
-            }
-          });
-
-          conn.on('close', () => {
-            listaJogadoresData = listaJogadoresData.filter(j => j.id !== conn.peer);
-            transmitirParaTodos({ tipo: 'ATUALIZAR_LISTA', jogadores: listaJogadoresData });
-            renderizarListaJogadores(listaJogadoresData);
-          });
-        });
-
-        peer.on('error', (err) => {
-          console.error(err);
-          alert('Erro ao criar sala: ' + err.type);
-        });
-
-      } catch (err) {
-        console.error(err);
-        alert('Falha ao inicializar o servidor de sala.');
-      }
-    });
-
-    function transmitirParaTodos(msg) {
-      conexoesCliente.forEach(c => { if (c.open) c.send(msg); });
+    // Função para Gerar Código P2P
+    function gerarCodigoUnico() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 5; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
     }
 
-    // ==========================================
-    // ENTRAR NA SALA (CLIENTE)
-    // ==========================================
-    btnEntrarCodigo.addEventListener('click', () => {
-      const cod = inputCodigoSala.value.trim().toUpperCase();
-      if (cod.length !== 5) { alert('Digite um código de 5 dígitos.'); return; }
-      if (btnEntrarCodigo.disabled) return; // evita clique duplo criando 2 conexões
-      btnEntrarCodigo.disabled = true;
+    // Criar Sala como Host
+    btnHost.addEventListener('click', () => {
+      popupOpcoes.classList.remove('active');
+      isHost = true;
+      meuId = 1;
+      salaCodigo = gerarCodigoUnico();
+      jogadores = [{ id: 1, nome: me.nome, foto: me.foto, isHost: true }];
+      
+      atualizarLobbyUI();
+      popupHost.classList.add('active');
+      btnIniciarPartida.style.display = 'inline-flex';
 
-      isHost = false;
-      codigoSalaAtual = cod;
-      peer = new Peer(peerConfig);
-
-      let entrouNaSala = false;
-      const timeoutConexao = setTimeout(() => {
-        if (!entrouNaSala) {
-          alert('Não foi possível conectar à sala. Verifique o código e sua internet.');
-          btnEntrarCodigo.disabled = false;
-        }
-      }, 10000);
-
-      peer.on('error', (err) => {
-        console.error(err);
-        clearTimeout(timeoutConexao);
-        alert('Erro ao conectar: ' + err.type);
-        btnEntrarCodigo.disabled = false;
+      peer = new Peer('DOMINIO-' + salaCodigo);
+      peer.on('open', () => {
+        atualizarDisplayCodigo();
       });
 
+      peer.on('connection', (conn) => {
+        if (jogadores.length >= 6) {
+          conn.send({ tipo: 'ERRO', msg: 'A sala está cheia!' });
+          setTimeout(() => conn.close(), 500);
+          return;
+        }
+
+        conexoes.push(conn);
+
+        conn.on('data', (data) => {
+          if (data.tipo === 'ENTRAR') {
+            const novoPlayerId = jogadores.length + 1;
+            const novoJogador = { id: novoPlayerId, nome: data.nome, foto: data.foto, isHost: false };
+            jogadores.push(novoJogador);
+
+            conn.send({ tipo: 'BOAS_VINDAS', meuId: novoPlayerId, jogadores });
+            transmitirParaTodos({ tipo: 'ATUALIZAR_JOGADORES', jogadores });
+            atualizarLobbyUI();
+          } else if (data.tipo === 'ATAQUE') {
+            // Repassa ataques recebidos para todos os outros clientes
+            transmitirParaTodos(data, conn);
+            if (typeof criarOndaMovimento === 'function') {
+              criarOndaMovimento(data.fromId, data.toId, data.amount, data.owner);
+            }
+          }
+        });
+
+        conn.on('close', () => {
+          conexoes = conexoes.filter(c => c !== conn);
+        });
+      });
+    });
+
+    // Entrar em uma sala existente
+    btnEntrarCodigo.addEventListener('click', () => {
+      const code = inputCodigoSala.value.trim().toUpperCase();
+      if (code.length !== 5) return alert('Digite um código válido de 5 caracteres.');
+
+      btnEntrarCodigo.disabled = true;
+      isHost = false;
+      salaCodigo = code;
+
+      peer = new Peer();
       peer.on('open', () => {
-        conexaoHost = peer.connect('DOMINIO_' + cod);
+        conexaoHost = peer.connect('DOMINIO-' + salaCodigo);
 
         conexaoHost.on('open', () => {
-          entrouNaSala = true;
-          clearTimeout(timeoutConexao);
-          conexaoHost.send({ tipo: 'ENTRAR', nome: nomeJogadorLocal || 'Jogador', foto: urlFotoPerfil });
-          popupCodigo.classList.remove('active');
-          btnIniciarPartida.style.display = 'none';
-          setTimeout(() => popupHost.classList.add('active'), 200);
+          conexaoHost.send({ tipo: 'ENTRAR', nome: me.nome, foto: me.foto });
         });
 
         conexaoHost.on('data', (data) => {
-          if (data.tipo === 'ATUALIZAR_LISTA') renderizarListaJogadores(data.jogadores);
-          else if (data.tipo === 'SEU_INDEX') meuIndexJogador = data.playerIndex;
-          else if (data.tipo === 'INICIAR_PARTIDA') iniciarTelaJogo();
-          else if (data.tipo === 'SYNC_STATE') {
-            if (typeof state !== 'undefined' && state.territories) {
-              data.territories.forEach((t, i) => {
-                if (state.territories[i]) {
-                  state.territories[i].owner = t.owner;
-                  state.territories[i].troops = t.troops;
-                }
-              });
+          if (data.tipo === 'BOAS_VINDAS') {
+            meuId = data.meuId;
+            jogadores = data.jogadores;
+            btnEntrarCodigo.disabled = false;
+            popupCodigo.classList.remove('active');
+            popupHost.classList.add('active');
+            btnIniciarPartida.style.display = 'none';
+            atualizarLobbyUI();
+          } else if (data.tipo === 'ATUALIZAR_JOGADORES') {
+            jogadores = data.jogadores;
+            atualizarLobbyUI();
+          } else if (data.tipo === 'INICIAR_PARTIDA') {
+            popupHost.classList.remove('active');
+            if (typeof iniciarPartidaComTimer === 'function') {
+              iniciarPartidaComTimer(jogadores.length, meuId, [conexaoHost]);
             }
-          }
-          else if (data.tipo === 'ERRO') {
+          } else if (data.tipo === 'ATAQUE') {
+            if (typeof criarOndaMovimento === 'function') {
+              criarOndaMovimento(data.fromId, data.toId, data.amount, data.owner);
+            }
+          } else if (data.tipo === 'ERRO') {
             alert(data.msg);
             btnEntrarCodigo.disabled = false;
           }
         });
       });
+
+      peer.on('error', () => {
+        alert('Não foi possível encontrar a sala com este código!');
+        btnEntrarCodigo.disabled = false;
+      });
     });
 
+    function transmitirParaTodos(dados, conexaoExcluida = null) {
+      conexoes.forEach(conn => {
+        if (conn && conn.open && conn !== conexaoExcluida) {
+          conn.send(dados);
+        }
+      });
+    }
+
+    // Iniciar Partida
     btnIniciarPartida.addEventListener('click', () => {
       if (isHost) {
         transmitirParaTodos({ tipo: 'INICIAR_PARTIDA' });
-        iniciarTelaJogo();
+        popupHost.classList.remove('active');
+        if (typeof iniciarPartidaComTimer === 'function') {
+          iniciarPartidaComTimer(jogadores.length, 1, conexoes);
+        }
       }
     });
 
-    function iniciarTelaJogo() {
-      popupHost.classList.remove('active');
-      homeScreen.style.display = 'none';
-      document.getElementById('hud').style.display = 'block';
-      document.getElementById('canvasWrap').style.display = 'flex';
-
-      if (typeof resize === 'function') resize();
-      if (typeof initGame === 'function') initGame();
-      if (typeof startGameLoop === 'function') startGameLoop();
+    // Atualização da Interface da Sala
+    function atualizarDisplayCodigo() {
+      codigoDisplay.textContent = codigoVisivel ? salaCodigo : '*****';
+      iconEye.setAttribute('data-lucide', codigoVisivel ? 'eye-off' : 'eye');
+      lucide.createIcons();
     }
 
     btnToggleCodigo.addEventListener('click', () => {
@@ -452,17 +361,47 @@
       atualizarDisplayCodigo();
     });
 
+    function atualizarLobbyUI() {
+      atualizarDisplayCodigo();
+      listaJogadores.innerHTML = '';
+      jogadores.forEach(j => {
+        const item = document.createElement('div');
+        item.className = 'player-item';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'player-avatar';
+        if (j.foto) avatar.style.backgroundImage = `url(${j.foto})`;
+        else avatar.textContent = j.nome.charAt(0).toUpperCase();
+
+        const name = document.createElement('span');
+        name.className = 'player-name';
+        name.textContent = j.nome;
+        if (j.isHost) name.innerHTML += ' <i data-lucide="crown" class="crown-icon"></i>';
+
+        item.appendChild(avatar);
+        item.appendChild(name);
+        listaJogadores.appendChild(item);
+      });
+      lucide.createIcons();
+    }
+
+    // Configurações
+    btnConfigSala.addEventListener('click', () => popupConfig.classList.add('active'));
+    btnSalvarConfig.addEventListener('click', () => popupConfig.classList.remove('active'));
+
     btnSairHost.addEventListener('click', () => {
       if (peer) peer.destroy();
+      conexoes = [];
       popupHost.classList.remove('active');
       setTimeout(() => popupOpcoes.classList.add('active'), 200);
     });
 
+    // Fechar overlays clicando fora
     [popupNome, popupOpcoes, popupCodigo, popupHost, popupConfig].forEach(modal => {
-      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+      modal.addEventListener('click', (e) => { 
+        if (e.target === modal) modal.classList.remove('active'); 
+      });
     });
   </script>
-
-  <script src="js/game.js"></script>
 </body>
 </html>
