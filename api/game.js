@@ -1,3 +1,4 @@
+// Referências ao Canvas principal e de buffer offline
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const wrap = document.getElementById('canvasWrap');
@@ -11,12 +12,22 @@ let dpr = window.devicePixelRatio || 1;
 let cssWidth = 0, cssHeight = 0;
 let layout = { offsetX: 0, offsetY: 0, mapW: 0, mapH: 0 };
 let delaunay, voronoi;
-let state, moves = [], hitParticles = [], selected = null, dragPos = null, running = true, lastGrowth = 0;
 
+// Estado do Jogo
+let state = { territories: [] };
+let moves = [];
+let hitParticles = [];
+let selected = null;
+let dragPos = null;
+let running = false;
+let lastGrowth = 0;
+
+// Configuração de Velocidade e Tempo das Tropas
 const TROOP_SPEED = 60;
 const MIN_DURATION = 1.2;
 const MAX_DURATION = 8.0;
 
+// Redimensiona o Canvas e reconstrói as superfícies de desenho
 function resize() {
   dpr = window.devicePixelRatio || 1;
   cssWidth = wrap.clientWidth;
@@ -32,9 +43,11 @@ function resize() {
   maskCanvas.width = canvas.width;
   maskCanvas.height = canvas.height;
 
-  computeLayout();
-  buildVoronoi();
-  buildMask();
+  if (typeof CURRENT_MAP !== 'undefined') {
+    computeLayout();
+    buildVoronoi();
+    buildMask();
+  }
 }
 window.addEventListener('resize', resize);
 
@@ -84,8 +97,9 @@ function pointInPoly(pt, poly) {
   return inside;
 }
 
+// Inicializa a Partida
 function initGame() {
-  computeLayout(); buildVoronoi(); buildMask();
+  resize();
   const points = CURRENT_MAP.countryDefs.map(c => toCanvas(c.nx, c.ny));
   
   const territories = CURRENT_MAP.countryDefs.map((c, i) => new Territory(i, c.code, points[i].x, points[i].y));
@@ -96,15 +110,44 @@ function initGame() {
   territories[startIdx].owner = 1;
   territories[startIdx].troops = 37;
 
-  moves = []; hitParticles = []; selected = null; dragPos = null; running = true; lastGrowth = 0;
+  moves = []; 
+  hitParticles = []; 
+  selected = null; 
+  dragPos = null; 
+  running = true; 
+  lastGrowth = 0;
+
   document.getElementById('overlay').style.display = 'none';
   updateScores();
+
+  if (typeof isHost !== 'undefined' && isHost) {
+    transmitirEstadoGame();
+  }
+}
+
+// Sincronização P2P: Envia dados do mapa para todos
+function transmitirEstadoGame() {
+  if (typeof isHost === 'undefined' || !isHost || !state || typeof transmitirParaTodos !== 'function') return;
+
+  const dadosSync = {
+    tipo: 'SYNC_STATE',
+    territories: state.territories.map(t => ({
+      id: t.id,
+      owner: t.owner,
+      troops: t.troops
+    }))
+  };
+
+  transmitirParaTodos(dadosSync);
 }
 
 function updateScores() {
+  if (!state || !state.territories) return;
   const count = state.territories.filter(t => t.owner === 1).length;
   const total = state.territories.length;
   const bar = document.getElementById('bar');
+  if (!bar) return;
+  
   bar.innerHTML = '';
   
   const pSeg = document.createElement('div');
@@ -128,10 +171,11 @@ function endGame(won) {
   document.getElementById('overlaySub').textContent = won ? 'Você dominou todos os territórios.' : 'Você perdeu seus territórios.';
 }
 
+// Lógica de Envio de Tropas
 function sendTroops(fromId, toId) {
   const from = state.territories[fromId];
   const to = state.territories[toId];
-  const totalToSend = from.troops;
+  const totalToSend = Math.floor(from.troops);
   if (totalToSend < 1) return;
 
   const dist = Math.hypot(to.x - from.x, to.y - from.y);
@@ -184,15 +228,23 @@ function resolveArrival(m) {
     }
   }
   updateScores();
+
+  if (typeof isHost !== 'undefined' && isHost) {
+    transmitirEstadoGame();
+  }
 }
 
 function growthTick() {
   for (const t of state.territories) {
     if (t.owner === 1) t.troops += 1;
   }
+  if (typeof isHost !== 'undefined' && isHost) {
+    transmitirEstadoGame();
+  }
 }
 
 function territoryAt(x, y) {
+  if (!state || !state.territories) return null;
   for (const t of state.territories) {
     const poly = voronoi.cellPolygon(t.id);
     if (poly && pointInPoly({ x, y }, poly)) return t;
@@ -206,23 +258,45 @@ function getPos(e) {
   return { x: src.clientX - rect.left, y: src.clientY - rect.top };
 }
 
+// Eventos de Entrada / Toque do Jogador
 function onDown(e) {
   if (!running) return;
   const p = getPos(e);
   const t = territoryAt(p.x, p.y);
-  if (t && t.owner === 1 && t.troops > 0) { selected = t; dragPos = p; e.preventDefault(); }
+  if (t && t.owner === 1 && t.troops > 0) { 
+    selected = t; 
+    dragPos = p; 
+    e.preventDefault(); 
+  }
 }
 
-function onMove(e) { if (selected) { dragPos = getPos(e); e.preventDefault(); } }
+function onMove(e) { 
+  if (selected) { 
+    dragPos = getPos(e); 
+    e.preventDefault(); 
+  } 
+}
 
 function onUp(e) {
   if (!selected) return;
   const p = getPos(e);
   const t = territoryAt(p.x, p.y);
+
   if (t && t.id !== selected.id) {
-    sendTroops(selected.id, t.id);
+    if (typeof isHost === 'undefined' || isHost) {
+      // Se for Host ou jogo Local, executa diretamente
+      sendTroops(selected.id, t.id);
+    } else if (typeof conexaoHost !== 'undefined' && conexaoHost && conexaoHost.open) {
+      // Se for Cliente, solicita a ao Host
+      conexaoHost.send({
+        tipo: 'ENVIAR_TROPAS',
+        fromId: selected.id,
+        toId: t.id
+      });
+    }
   }
-  selected = null; dragPos = null;
+  selected = null; 
+  dragPos = null;
 }
 
 canvas.addEventListener('mousedown', onDown);
@@ -232,17 +306,28 @@ canvas.addEventListener('touchstart', onDown, { passive: false });
 canvas.addEventListener('touchmove', onMove, { passive: false });
 canvas.addEventListener('touchend', onUp, { passive: false });
 
-document.getElementById('restartBtn').addEventListener('click', initGame);
-document.getElementById('overlayBtn').addEventListener('click', initGame);
+const restartBtn = document.getElementById('restartBtn');
+if (restartBtn) restartBtn.addEventListener('click', initGame);
 
+const overlayBtn = document.getElementById('overlayBtn');
+if (overlayBtn) overlayBtn.addEventListener('click', initGame);
+
+// Loop Principal de Atualizao e Renderizao (60 FPS)
 let lastTime = performance.now();
+
 function loop(now) {
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
   if (running) {
-    lastGrowth += dt;
-    if (lastGrowth > 1.5) { growthTick(); lastGrowth = 0; }
+    // Apenas o Host faz o tick de ganho automático
+    if (typeof isHost === 'undefined' || isHost) {
+      lastGrowth += dt;
+      if (lastGrowth > 1.5) { 
+        growthTick(); 
+        lastGrowth = 0; 
+      }
+    }
 
     for (const t of state.territories) {
       if (t.pulseAnim > 0) {
@@ -286,15 +371,22 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+// Renderiza a Interface e o Mapa no Canvas
 function render() {
   ctx.save();
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, cssWidth, cssHeight);
 
+  if (!state || !state.territories || state.territories.length === 0) {
+    ctx.restore();
+    return;
+  }
+
   offCtx.save();
   offCtx.scale(dpr, dpr);
   offCtx.clearRect(0, 0, cssWidth, cssHeight);
 
+  // Desenha Células de Voronoi dos Territórios
   for (const t of state.territories) {
     const poly = voronoi.cellPolygon(t.id);
     if (!poly) continue;
@@ -316,6 +408,7 @@ function render() {
     }
   }
 
+  // Aplica a Máscara das Massas de Terra (Continentes)
   offCtx.globalCompositeOperation = 'destination-in';
   offCtx.drawImage(maskCanvas, 0, 0, cssWidth, cssHeight);
   offCtx.globalCompositeOperation = 'source-over';
@@ -323,6 +416,7 @@ function render() {
 
   ctx.drawImage(offCanvas, 0, 0, cssWidth, cssHeight);
 
+  // Linha Guia de Mira ao Arrastar
   if (selected && dragPos) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 2;
@@ -334,6 +428,7 @@ function render() {
     ctx.setLineDash([]);
   }
 
+  // Desenha as Tropas em Trânsito (Bolinhas)
   for (const m of moves) {
     if (m.delay > 0) continue;
 
@@ -364,6 +459,7 @@ function render() {
     ctx.fill();
   }
 
+  // Partículas de Impacto
   for (const p of hitParticles) {
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -373,6 +469,7 @@ function render() {
     ctx.globalAlpha = 1.0;
   }
 
+  // Circulos dos Territórios e Valores de Tropas
   for (const t of state.territories) {
     if (t.pulseAnim > 0) {
       const waveRadius = 17 + (1 - t.pulseAnim) * 28;
@@ -407,6 +504,5 @@ function render() {
   ctx.restore();
 }
 
-resize();
-initGame();
+// Inicia o Loop principal do Canvas
 requestAnimationFrame(loop);
