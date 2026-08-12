@@ -59,9 +59,9 @@ function resize() {
 window.addEventListener('resize', resize);
 
 function computeLayout() {
-  const padTop = 15, padBottom = 15;
+  const padTop = 6, padBottom = 6;
   const availH = Math.max(200, cssHeight - padTop - padBottom);
-  const availW = cssWidth - 20;
+  const availW = cssWidth - 6;
   const MAP_ASPECT = CURRENT_MAP.aspectRatio || 1.25;
   let mapH = availH, mapW = mapH * MAP_ASPECT;
   if (mapW > availW) { mapW = availW; mapH = mapW / MAP_ASPECT; }
@@ -185,25 +185,8 @@ function initGame(config) {
 window.initGame = initGame;
 
 function updateScores() {
-  if (!state || !state.territories) return;
-  const bar = document.getElementById('bar');
-  if (!bar) return;
-
-  bar.innerHTML = '';
-  const total = state.territories.length;
-
-  Object.keys(CURRENT_MAP.colors).forEach(ownerId => {
-    const id = parseInt(ownerId);
-    if (id === 0) return;
-
-    const count = state.territories.filter(t => t.owner === id).length;
-    if (count > 0) {
-      const seg = document.createElement('div');
-      seg.style.width = (count / total * 100) + '%';
-      seg.style.background = CURRENT_MAP.colors[id];
-      bar.appendChild(seg);
-    }
-  });
+  // Barra de progresso removida do HUD a pedido do usuário; função mantida
+  // vazia para não quebrar as chamadas existentes.
 }
 
 function sendTroops(fromId, toId) {
@@ -345,21 +328,6 @@ window.addEventListener('mouseup', onUp);
 canvas.addEventListener('touchstart', onDown, { passive: false });
 canvas.addEventListener('touchmove', onMove, { passive: false });
 canvas.addEventListener('touchend', onUp, { passive: false });
-
-const restartBtn = document.getElementById('restartBtn');
-if (restartBtn) {
-  restartBtn.addEventListener('click', () => {
-    const online = (typeof onlineMode !== 'undefined' && onlineMode);
-    const souHost = (typeof isHost !== 'undefined' && isHost);
-    if (online && !souHost) return; // só o host pode reiniciar em partida online
-    if (online && souHost) {
-      initGame({ playersCount: (typeof listaJogadoresData !== 'undefined' ? listaJogadoresData.length : 1), assignCapitals: true });
-      broadcastState();
-    } else {
-      initGame({ playersCount: 1, assignCapitals: true });
-    }
-  });
-}
 
 // ==========================================
 // SINCRONIZAÇÃO DE ESTADO (HOST -> CLIENTES)
@@ -595,19 +563,19 @@ function render() {
 
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur = 5;
+    ctx.shadowBlur = 4;
 
     ctx.beginPath();
-    ctx.arc(finalX, finalY, 6.5, 0, Math.PI * 2);
+    ctx.arc(finalX, finalY, 5.2, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2;
     ctx.strokeStyle = ownerColor;
     ctx.stroke();
 
     ctx.shadowBlur = 0;
     ctx.beginPath();
-    ctx.arc(finalX, finalY, 2.8, 0, Math.PI * 2);
+    ctx.arc(finalX, finalY, 2.2, 0, Math.PI * 2);
     ctx.fillStyle = ownerColor;
     ctx.fill();
     ctx.restore();
@@ -624,7 +592,7 @@ function render() {
 
   for (const t of state.territories) {
     if (t.pulseAnim > 0) {
-      const waveRadius = 17 + (1 - t.pulseAnim) * 28;
+      const waveRadius = 12 + (1 - t.pulseAnim) * 20;
       ctx.beginPath();
       ctx.arc(t.x, t.y, waveRadius, 0, Math.PI * 2);
       ctx.strokeStyle = CURRENT_MAP.colors[t.owner];
@@ -634,9 +602,9 @@ function render() {
       ctx.globalAlpha = 1.0;
     }
 
-    const impactScale = t.impactAnim > 0 ? Math.sin(t.impactAnim * Math.PI) * 4 : 0;
-    const conquestScale = t.pulseAnim > 0 ? Math.sin(t.pulseAnim * Math.PI) * 6 : 0;
-    const radius = 17 + impactScale + conquestScale;
+    const impactScale = t.impactAnim > 0 ? Math.sin(t.impactAnim * Math.PI) * 3 : 0;
+    const conquestScale = t.pulseAnim > 0 ? Math.sin(t.pulseAnim * Math.PI) * 4 : 0;
+    const radius = 12 + impactScale + conquestScale;
 
     ctx.beginPath();
     ctx.arc(t.x, t.y, radius, 0, Math.PI * 2);
@@ -647,7 +615,7 @@ function render() {
     ctx.stroke();
 
     ctx.fillStyle = '#0f172a';
-    ctx.font = '800 13px "Plus Jakarta Sans", sans-serif';
+    ctx.font = '800 11px "Plus Jakarta Sans", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(Math.floor(t.troops), t.x, t.y);
@@ -656,12 +624,12 @@ function render() {
     // Se outro jogador conquistar essa capital, a coroa (e o bônus) passam a ser dele.
     if (t.isCapital) {
       ctx.save();
-      ctx.font = '18px "Plus Jakarta Sans", sans-serif';
+      ctx.font = '14px "Plus Jakarta Sans", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 3;
-      ctx.fillText('👑', t.x, t.y - radius - 13);
+      ctx.fillText('👑', t.x, t.y - radius - 10);
       ctx.restore();
     }
   }
