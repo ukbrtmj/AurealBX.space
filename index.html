@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Domínio - Jogo de Estratégia</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;800&family=Roboto+Slab:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+
+  <div id="homeScreen">
+    <div class="container">
+      <img src="https://file.garden/anP6_SXXiQfEPX26/file_000000000c14820e9f74ff8e3421f51c.png" alt="Logo" class="logo" oncontextmenu="return false;" draggable="false">
+      <div class="button-group">
+        <button class="btn" id="btnOnline">Online</button>
+        <button class="btn" id="btnLocal">Local</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupNome">
+    <div class="modal">
+      <h2>Personalize seu Perfil</h2>
+      <label for="uploadFoto" class="avatar-upload" title="Escolha uma foto">
+        <div class="avatar-preview" id="avatarPreview">?</div>
+        <div class="avatar-badge"><i data-lucide="camera"></i></div>
+      </label>
+      <input type="file" id="uploadFoto" accept="image/*">
+      <input type="text" id="nomeUsuario" placeholder="Digite seu nome..." autocomplete="off" maxlength="15">
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnCancelarNome">Cancelar</button>
+        <button class="btn" id="btnConfirmarNome">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupOpcoes">
+    <div class="modal">
+      <h2>Modo de Jogo</h2>
+      <div class="options-section">
+        <button class="btn btn-menu btn-secondary" id="btnAbrirCodigo">Colocar Código</button>
+        <button class="btn btn-menu" id="btnHost">Host</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupCodigo">
+    <div class="modal">
+      <h2>Digite o Código</h2>
+      <input type="text" id="inputCodigoSala" placeholder="EX: A1B2C" autocomplete="off" maxlength="5" style="text-transform: uppercase;">
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnVoltarCodigo">Voltar</button>
+        <button class="btn" id="btnEntrarCodigo">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupHost">
+    <div class="modal">
+      <div class="host-header">
+        <div class="code-container">
+          <span class="code-label">Código da Sala</span>
+          <div class="code-box">
+            <span class="code-display" id="codigoDisplay">*****</span>
+            <button class="btn-icon" id="btnToggleCodigo" title="Mostrar/Ocultar Código"><i data-lucide="eye" id="iconEye"></i></button>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-config" id="btnConfigSala">
+          <i data-lucide="settings"></i> Configurações da Sala
+        </button>
+      </div>
+
+      <h2>Sala de Espera</h2>
+      <span class="players-list-title">Jogadores Conectados</span>
+      <div class="players-list" id="listaJogadores"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnSairHost">Sair</button>
+        <button class="btn" id="btnIniciarPartida">Iniciar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupConfig">
+    <div class="modal">
+      <h2>Configurações</h2>
+      
+      <label style="color: #888899; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; align-self: flex-start; font-weight: 700;">Escolha o Mapa</label>
+      <select id="selectMapa">
+        <option value="AFRICA">África</option>
+        <option value="ARQUIPELAGO">Arquipélago</option>
+        <option value="BRASIL">Brasil</option>
+      </select>
+
+      <div class="modal-actions">
+        <button class="btn" id="btnSalvarConfig">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupCountdown">
+    <div class="countdown-content">
+      <span class="countdown-label">A partida começa em</span>
+      <div class="countdown-ring">
+        <svg class="countdown-ring-svg" viewBox="0 0 160 160">
+          <circle class="countdown-ring-bg" cx="80" cy="80" r="70"></circle>
+          <circle class="countdown-ring-progress" id="countdownRingProgress" cx="80" cy="80" r="70"></circle>
+        </svg>
+        <div class="countdown-number" id="countdownNumber">5</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="controls">
+      <div id="legend"></div>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <canvas id="game"></canvas>
+  </div>
+
+  <script src="maps/Africa/africa.js"></script>
+  <script src="maps/Arquipelago/arquipelago.js"></script>
+  <script src="maps/Brasil/brasil.js"></script>
+  <script src="js/entities.js"></script>
+
+  <script>
+    // Referências DOM
+    const homeScreen = document.getElementById('homeScreen');
+    const popupNome = document.getElementById('popupNome');
+    const popupOpcoes = document.getElementById('popupOpcoes');
+    const popupCodigo = document.getElementById('popupCodigo');
+    const popupHost = document.getElementById('popupHost');
+    const popupConfig = document.getElementById('popupConfig');
+
+    const btnOnline = document.getElementById('btnOnline');
+    const btnLocal = document.getElementById('btnLocal');
+    const btnCancelarNome = document.getElementById('btnCancelarNome');
+    const btnConfirmarNome = document.getElementById('btnConfirmarNome');
+    const btnAbrirCodigo = document.getElementById('btnAbrirCodigo');
+    const btnVoltarCodigo = document.getElementById('btnVoltarCodigo');
+    const btnEntrarCodigo = document.getElementById('btnEntrarCodigo');
+    const btnHost = document.getElementById('btnHost');
+    const btnToggleCodigo = document.getElementById('btnToggleCodigo');
+    const btnConfigSala = document.getElementById('btnConfigSala');
+    const btnSalvarConfig = document.getElementById('btnSalvarConfig');
+    const selectMapa = document.getElementById('selectMapa');
+    const btnSairHost = document.getElementById('btnSairHost');
+    const btnIniciarPartida = document.getElementById('btnIniciarPartida');
+
+    const inputNome = document.getElementById('nomeUsuario');
+    const inputFoto = document.getElementById('uploadFoto');
+    const avatarPreview = document.getElementById('avatarPreview');
+    const inputCodigoSala = document.getElementById('inputCodigoSala');
+    const codigoDisplay = document.getElementById('codigoDisplay');
+    const listaJogadores = document.getElementById('listaJogadores');
+
+    // Estado Local
+    let fotoPersonalizada = false;
+    let urlFotoPerfil = null;
+    let nomeJogadorLocal = '';
+    let codigoSalaAtual = '';
+    let codigoVisivel = false;
+    let isHost = false;
+    let meuIndexJogador = 1;
+    let onlineMode = false; // true quando Host ou Cliente de uma partida online
+    let mapaSelecionado = 'AFRICA'; // mapa escolhido em "Configurações da Sala"
+
+    // Instância de Rede (Socket.IO — conecta no servidor da Discloud, que é
+    // quem decide o resultado dos ataques e sincroniza pra todo mundo)
+    // TROQUE pela URL do seu servidor depois de fazer o deploy na Discloud,
+    // ex: "https://aurealbx-server.discloud.app"
+    const SERVER_URL = 'aurealbxspace.discloud.app';
+    let socket = null;
+    let listaJogadoresData = [];
+
+    lucide.createIcons();
+
+    // Aplica o mapa escolhido (mapaSelecionado) como o mapa ativo do jogo.
+    // Precisa ser chamada antes de iniciar a partida, tanto no host quanto
+    // nos clientes, para todo mundo jogar no mesmo mapa.
+    function aplicarMapaSelecionado() {
+      const mapa = (window.MAPS && window.MAPS[mapaSelecionado]) || window.MAPS.AFRICA;
+      if (mapa) window.CURRENT_MAP = mapa;
+    }
+
+    // Só o host pode mexer nas configurações da sala. Para quem entrou
+    // como convidado, o botão fica escurecido, sem clique, mostrando
+    // só a coroa no lugar do texto/ícone de configurações.
+    function atualizarBotaoConfig() {
+      if (isHost) {
+        btnConfigSala.disabled = false;
+        btnConfigSala.classList.remove('btn-config-locked');
+        btnConfigSala.innerHTML = '<i data-lucide="settings"></i> Configurações da Sala';
+      } else {
+        btnConfigSala.disabled = true;
+        btnConfigSala.classList.add('btn-config-locked');
+        btnConfigSala.innerHTML = '<i data-lucide="crown"></i>';
+      }
+      lucide.createIcons();
+    }
+
+    function gerarCodigoRandomico() {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let res = '';
+      for (let i = 0; i < 5; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+      return res;
+    }
+
+    function renderizarListaJogadores(jogadores) {
+      listaJogadores.innerHTML = '';
+      jogadores.forEach((j, index) => {
+        const card = document.createElement('div');
+        card.className = 'player-card';
+
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'player-avatar';
+        if (j.foto) avatarDiv.style.backgroundImage = `url('${j.foto}')`;
+        else avatarDiv.textContent = j.nome ? j.nome.charAt(0).toUpperCase() : '?';
+
+        const playerColor = (typeof CURRENT_MAP !== 'undefined' && CURRENT_MAP.colors && CURRENT_MAP.colors[index + 1]) 
+          ? CURRENT_MAP.colors[index + 1] 
+          : '#FFD700';
+          
+        avatarDiv.style.borderColor = playerColor;
+
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'player-name';
+        nameDiv.innerHTML = `${j.nome} ${j.isHost ? '<i data-lucide="crown" class="crown-icon"></i>' : ''}`;
+
+        card.appendChild(avatarDiv);
+        card.appendChild(nameDiv);
+        listaJogadores.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    function atualizarDisplayCodigo() {
+      const iconEye = document.getElementById('iconEye');
+      if (codigoVisivel) {
+        codigoDisplay.textContent = codigoSalaAtual;
+        iconEye.setAttribute('data-lucide', 'eye-off');
+      } else {
+        codigoDisplay.textContent = '*****';
+        iconEye.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    }
+
+    // Ações dos Modais
+    btnLocal.addEventListener('click', () => {
+      onlineMode = false;
+      isHost = false;
+      meuIndexJogador = 1;
+      iniciarTelaJogo();
+    });
+    btnOnline.addEventListener('click', () => { popupNome.classList.add('active'); inputNome.focus(); });
+    btnCancelarNome.addEventListener('click', () => popupNome.classList.remove('active'));
+
+    inputNome.addEventListener('input', () => {
+      if (!fotoPersonalizada) {
+        const txt = inputNome.value.trim();
+        avatarPreview.textContent = txt ? txt.charAt(0).toUpperCase() : '?';
+      }
+    });
+
+    inputFoto.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          urlFotoPerfil = evt.target.result;
+          avatarPreview.style.backgroundImage = `url('${urlFotoPerfil}')`;
+          avatarPreview.textContent = '';
+          fotoPersonalizada = true;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    btnConfirmarNome.addEventListener('click', () => {
+      const nome = inputNome.value.trim();
+      if (nome) {
+        nomeJogadorLocal = nome;
+        popupNome.classList.remove('active');
+        setTimeout(() => popupOpcoes.classList.add('active'), 200);
+      } else {
+        alert('Por favor, digite seu nome.');
+      }
+    });
+
+    btnAbrirCodigo.addEventListener('click', () => {
+      popupOpcoes.classList.remove('active');
+      setTimeout(() => { popupCodigo.classList.add('active'); inputCodigoSala.focus(); }, 200);
+    });
+
+    btnVoltarCodigo.addEventListener('click', () => {
+      popupCodigo.classList.remove('active');
+      setTimeout(() => popupOpcoes.classList.add('active'), 200);
+    });
+
+    btnConfigSala.addEventListener('click', () => {
+      if (!isHost) return; // trancado para quem não é host
+      selectMapa.value = mapaSelecionado;
+      popupConfig.classList.add('active');
+    });
+
+    btnSalvarConfig.addEventListener('click', () => {
+      mapaSelecionado = selectMapa.value;
+      aplicarMapaSelecionado();
+      popupConfig.classList.remove('active');
+
+      // Avisa o servidor, que repassa pra todo mundo já conectado na sala.
+      if (isHost && onlineMode && socket) {
+        socket.emit('configSala', { mapa: mapaSelecionado });
+      }
+    });
+
+    // ==========================================
+    // CRIAÇÃO DA SALA (HOST)
+    // ==========================================
+    // Agora o host NÃO é mais quem decide o jogo — ele só cria a sala no
+    // servidor da Discloud e entra nela como jogador 1, igual todo mundo.
+    btnHost.addEventListener('click', () => {
+      if (typeof io === 'undefined') {
+        alert('Erro: A biblioteca Socket.IO não carregou. Verifique sua conexão.');
+        return;
+      }
+
+      isHost = true;
+      onlineMode = true;
+      meuIndexJogador = 1;
+
+      socket = io(SERVER_URL);
+
+      socket.on('connect_error', () => {
+        alert('Não foi possível conectar ao servidor. Verifique a URL do servidor (SERVER_URL) e sua internet.');
+      });
+
+      socket.emit('criarSala', { nome: nomeJogadorLocal || 'Host', foto: urlFotoPerfil });
+
+      socket.on('salaCriada', ({ codigo, jogadores, playerIndex }) => {
+        codigoSalaAtual = codigo;
+        meuIndexJogador = playerIndex;
+        listaJogadoresData = jogadores;
+
+        codigoVisivel = false;
+        atualizarDisplayCodigo();
+        renderizarListaJogadores(listaJogadoresData);
+        atualizarBotaoConfig();
+        popupOpcoes.classList.remove('active');
+        setTimeout(() => popupHost.classList.add('active'), 200);
+      });
+
+      registrarEventosSocket();
+    });
+
+    // Eventos comuns ao host e aos clientes (o servidor manda os mesmos
+    // tipos de mensagem pra todo mundo).
+    function registrarEventosSocket() {
+      socket.on('atualizarLista', ({ jogadores }) => {
+        listaJogadoresData = jogadores;
+        renderizarListaJogadores(jogadores);
+      });
+
+      socket.on('configSala', ({ mapa }) => {
+        mapaSelecionado = mapa;
+      });
+
+      socket.on('iniciarPartida', ({ mapa }) => {
+        mapaSelecionado = mapa;
+        popupHost.classList.remove('active');
+        iniciarContagem(() => iniciarTelaJogo());
+      });
+
+      socket.on('syncState', (data) => {
+        if (typeof applySyncState === 'function') applySyncState(data);
+      });
+
+      socket.on('erro', (data) => {
+        alert(data.msg);
+        btnEntrarCodigo.disabled = false;
+      });
+
+      socket.on('salaEncerrada', (data) => {
+        alert(data.msg || 'A sala foi encerrada.');
+        location.reload();
+      });
+    }
+
+    // ==========================================
+    // ENTRAR NA SALA (CLIENTE)
+    // ==========================================
+    btnEntrarCodigo.addEventListener('click', () => {
+      const cod = inputCodigoSala.value.trim().toUpperCase();
+      if (cod.length !== 5) { alert('Digite um código de 5 dígitos.'); return; }
+      if (btnEntrarCodigo.disabled) return; // evita clique duplo criando 2 conexões
+      btnEntrarCodigo.disabled = true;
+
+      isHost = false;
+      onlineMode = true;
+      codigoSalaAtual = cod;
+
+      socket = io(SERVER_URL);
+
+      let entrouNaSala = false;
+      const timeoutConexao = setTimeout(() => {
+        if (!entrouNaSala) {
+          alert('Não foi possível conectar à sala. Verifique o código e sua internet.');
+          btnEntrarCodigo.disabled = false;
+        }
+      }, 10000);
+
+      socket.on('connect_error', () => {
+        clearTimeout(timeoutConexao);
+        alert('Erro ao conectar ao servidor. Verifique a URL do servidor (SERVER_URL) e sua internet.');
+        btnEntrarCodigo.disabled = false;
+      });
+
+      socket.on('connect', () => {
+        socket.emit('entrarSala', { codigo: cod, nome: nomeJogadorLocal || 'Jogador', foto: urlFotoPerfil });
+      });
+
+      socket.on('seuIndice', ({ playerIndex, mapa }) => {
+        entrouNaSala = true;
+        clearTimeout(timeoutConexao);
+        meuIndexJogador = playerIndex;
+        if (mapa) mapaSelecionado = mapa;
+        popupCodigo.classList.remove('active');
+        btnIniciarPartida.style.display = 'none';
+        atualizarBotaoConfig(); // convidado: botão de config fica travado
+        setTimeout(() => popupHost.classList.add('active'), 200);
+      });
+
+      registrarEventosSocket();
+    });
+
+    btnIniciarPartida.addEventListener('click', () => {
+      if (isHost && socket) {
+        socket.emit('iniciarPartida');
+        // Não chama iniciarContagem() aqui: o host espera o evento
+        // 'iniciarPartida' voltar do servidor, igual todo mundo, pra a
+        // contagem começar no mesmíssimo instante pra todos os jogadores.
+      }
+    });
+
+    // Timer de 5s exibido antes da partida começar, igual para todo mundo
+    // (cada jogador roda a contagem no seu próprio dispositivo assim que
+    // recebe o aviso de início, então todos veem praticamente ao mesmo tempo).
+    // O anel ao redor do número esvazia suavemente a cada segundo, e ao
+    // chegar em zero o jogo começa direto — sem nenhum texto extra piscando.
+    const COUNTDOWN_TOTAL = 5;
+    const RING_CIRCUMFERENCE = 439.8; // 2 * PI * 70 (raio do círculo no SVG)
+
+    function iniciarContagem(callback) {
+      const overlay = document.getElementById('popupCountdown');
+      const numberEl = document.getElementById('countdownNumber');
+      const ringEl = document.getElementById('countdownRingProgress');
+      let count = COUNTDOWN_TOTAL;
+
+      overlay.classList.add('active');
+      atualizarNumeroContagem(numberEl, count);
+      atualizarAnelContagem(ringEl, count);
+
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          atualizarNumeroContagem(numberEl, count);
+          atualizarAnelContagem(ringEl, count);
+        } else {
+          clearInterval(interval);
+          atualizarAnelContagem(ringEl, 0);
+          overlay.classList.remove('active');
+          // Pequena espera só para acompanhar o fade suave do overlay.
+          setTimeout(callback, 300);
+        }
+      }, 1000);
+    }
+
+    function atualizarNumeroContagem(el, count) {
+      el.textContent = count;
+      reiniciarAnimacaoNumero(el);
+    }
+
+    function atualizarAnelContagem(ringEl, count) {
+      if (!ringEl) return;
+      const progresso = count / COUNTDOWN_TOTAL;
+      ringEl.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - progresso);
+    }
+
+    function reiniciarAnimacaoNumero(el) {
+      el.style.animation = 'none';
+      void el.offsetWidth;
+      el.style.animation = '';
+    }
+
+    function iniciarTelaJogo() {
+      aplicarMapaSelecionado();
+
+      popupHost.classList.remove('active');
+      homeScreen.style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+      document.getElementById('canvasWrap').style.display = 'flex';
+
+      montarLegenda();
+
+      if (typeof resize === 'function') resize();
+
+      if (typeof initGame === 'function') {
+        if (onlineMode) {
+          // O servidor da Discloud é quem decide os territórios/capitais agora
+          // (host ou não, todo mundo só espera o primeiro 'syncState').
+          initGame({ playersCount: listaJogadoresData.length, assignCapitals: false });
+        } else {
+          initGame({ playersCount: 1, assignCapitals: true });
+        }
+      }
+
+      // Animação de entrada do mapa
+      const canvasWrap = document.getElementById('canvasWrap');
+      canvasWrap.classList.remove('map-reveal');
+      void canvasWrap.offsetWidth;
+      canvasWrap.classList.add('map-reveal');
+
+      if (typeof startGameLoop === 'function') startGameLoop();
+    }
+
+    // Monta a legenda do HUD com todos os jogadores da partida e suas cores
+    function montarLegenda() {
+      const legend = document.getElementById('legend');
+      if (!legend) return;
+      legend.innerHTML = '';
+
+      if (onlineMode && listaJogadoresData.length) {
+        listaJogadoresData.forEach((j, index) => {
+          const color = (typeof CURRENT_MAP !== 'undefined' && CURRENT_MAP.colors[index + 1]) || '#94a3b8';
+          const souEu = (index + 1) === meuIndexJogador;
+          const span = document.createElement('span');
+          span.innerHTML = `<i class="ldot" style="background:${color}"></i>${j.nome}${souEu ? ' (Você)' : ''}`;
+          legend.appendChild(span);
+        });
+      } else {
+        const corJogador = (typeof CURRENT_MAP !== 'undefined' && CURRENT_MAP.colors[1]) || '#2563eb';
+        legend.innerHTML = `
+          <span><i class="ldot" style="background:${corJogador}"></i>Você</span>
+          <span><i class="ldot" style="background:#94a3b8"></i>Neutro</span>`;
+      }
+    }
+
+    btnToggleCodigo.addEventListener('click', () => {
+      codigoVisivel = !codigoVisivel;
+      atualizarDisplayCodigo();
+    });
+
+    btnSairHost.addEventListener('click', () => {
+      if (socket) socket.disconnect();
+      popupHost.classList.remove('active');
+      setTimeout(() => popupOpcoes.classList.add('active'), 200);
+    });
+
+    [popupNome, popupOpcoes, popupCodigo, popupHost, popupConfig].forEach(modal => {
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+    });
+  </script>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
