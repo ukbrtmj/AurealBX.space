@@ -1,0 +1,604 @@
+/* ==========================================================================
+   1. RESET & CONFIGURAÇÕES GERAIS
+   ========================================================================== */
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+  -webkit-tap-highlight-color: transparent; 
+  user-select: none; 
+}
+
+html, body { 
+  height: 100%; 
+  height: 100dvh;
+  width: 100%;
+  overscroll-behavior: none; 
+}
+
+body {
+  background: radial-gradient(circle at center, #1e1e2f 0%, #0d0d15 100%);
+  font-family: 'Roboto Slab', serif;
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #f8fafc;
+  position: relative;
+}
+
+/* Brilho suave no fundo da tela principal */
+body::before {
+  content: '';
+  position: absolute;
+  width: 350px;
+  height: 350px;
+  background: rgba(255, 215, 0, 0.06);
+  filter: blur(120px);
+  border-radius: 50%;
+  z-index: 0;
+}
+
+/* ==========================================================================
+   2. TELA PRINCIPAL (HOME)
+   ========================================================================== */
+#homeScreen { 
+  width: 100%; 
+  height: 100vh; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  position: absolute; 
+  inset: 0; 
+  z-index: 1; 
+}
+
+.container { 
+  position: relative; 
+  z-index: 1; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  text-align: center; 
+  padding: 20px; 
+  width: 100%; 
+}
+
+/* Proteção contra cópia e clique na Logo */
+.logo {
+  max-width: 420px; 
+  width: 90%; 
+  height: auto; 
+  margin-bottom: 50px;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.5));
+  transition: transform 0.3s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.button-group { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 24px; 
+  width: 100%; 
+  max-width: 300px; 
+}
+
+/* ==========================================================================
+   3. BOTÕES ESTILIZADOS
+   ========================================================================== */
+.btn {
+  font-family: 'Roboto Slab', serif; 
+  font-weight: 700; 
+  font-size: 1.3rem; 
+  color: #000000;
+  background-color: #FFD700; 
+  border: 3px solid #000000; 
+  padding: 14px 24px; 
+  border-radius: 12px;
+  text-decoration: none; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  box-shadow: 0px 6px 0px #000000;
+  transition: all 0.15s ease; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 8px; 
+  text-align: center;
+}
+
+.btn:hover { 
+  background-color: #FFE033; 
+  transform: translateY(-2px); 
+  box-shadow: 0px 8px 0px #000000; 
+}
+
+.btn:active { 
+  transform: translateY(4px); 
+  box-shadow: 0px 2px 0px #000000; 
+}
+
+.btn-secondary { 
+  background-color: #333344; 
+  color: #FFFFFF; 
+  border: 3px solid #000000; 
+}
+
+.btn-secondary:hover { 
+  background-color: #444455; 
+}
+
+/* ==========================================================================
+   4. MODAIS E OVERLAYS
+   ========================================================================== */
+.overlay {
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%; 
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px); 
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+  opacity: 0; 
+  visibility: hidden; 
+  transition: opacity 0.3s ease, visibility 0.3s ease; 
+  z-index: 100;
+}
+
+.overlay.active { 
+  opacity: 1; 
+  visibility: visible; 
+}
+
+.modal {
+  background-color: #1a1a24; 
+  border: 3px solid #FFD700; 
+  border-radius: 16px; 
+  padding: 25px;
+  width: 90%; 
+  max-width: 440px; 
+  text-align: center; 
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.7);
+  transform: scale(0.8); 
+  transition: transform 0.3s ease; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center;
+}
+
+.overlay.active .modal { 
+  transform: scale(1); 
+}
+
+.modal h2 { 
+  color: #FFFFFF; 
+  font-size: 1.6rem; 
+  margin-bottom: 20px; 
+  font-weight: 700; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+}
+
+/* Inputs de Texto e Selects nos Modais */
+.modal input[type="text"], 
+.modal select {
+  width: 100%; 
+  padding: 14px 16px; 
+  font-family: 'Roboto Slab', serif; 
+  font-size: 1rem; 
+  background-color: #0d0d15;
+  color: #FFFFFF; 
+  border: 2px solid #FFD700; 
+  border-radius: 8px; 
+  outline: none; 
+  margin-bottom: 24px; 
+  text-align: center; 
+  letter-spacing: 1px;
+}
+
+.modal input[type="text"]:focus, 
+.modal select:focus {
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.modal-actions { 
+  display: flex; 
+  gap: 12px; 
+  width: 100%; 
+}
+
+.modal-actions .btn { 
+  flex: 1; 
+  font-size: 1rem; 
+}
+
+.options-section { 
+  width: 100%; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 16px; 
+}
+
+.btn-menu { 
+  width: 100%; 
+  font-size: 1.1rem; 
+}
+
+/* ==========================================================================
+   5. COMPONENTES DO LOBBY / HOST
+   ========================================================================== */
+.host-header {
+  width: 100%; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 12px;
+  margin-bottom: 20px; 
+  background-color: #0d0d15; 
+  padding: 14px; 
+  border-radius: 10px; 
+  border: 2px solid #333344;
+}
+
+.code-container { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 4px; 
+}
+
+.code-label { 
+  font-size: 0.7rem; 
+  color: #888899; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  font-weight: 700; 
+}
+
+.code-box { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
+}
+
+.code-display { 
+  font-size: 1.4rem; 
+  font-weight: 900; 
+  color: #FFD700; 
+  letter-spacing: 2px; 
+}
+
+.btn-icon { 
+  background: none; 
+  border: none; 
+  color: #FFD700; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  padding: 4px; 
+}
+
+.btn-icon i { 
+  width: 18px; 
+  height: 18px; 
+}
+
+/* Botão de Configurações do Host */
+.btn-config {
+  width: 100%; 
+  font-size: 0.85rem; 
+  padding: 8px 12px; 
+  border-radius: 8px;
+  border-width: 2px; 
+  box-shadow: none; 
+  gap: 8px; 
+  margin-top: 4px;
+}
+
+.btn-config i { 
+  width: 16px; 
+  height: 16px; 
+}
+
+/* Avatar / Foto de Perfil */
+.avatar-upload { 
+  position: relative; 
+  margin-bottom: 20px; 
+  cursor: pointer; 
+}
+
+.avatar-preview {
+  width: 90px; 
+  height: 90px; 
+  border-radius: 50%; 
+  border: 3px solid #FFD700; 
+  background-color: #0d0d15;
+  color: #FFD700; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  font-size: 2.5rem; 
+  font-weight: 900;
+  overflow: hidden; 
+  background-size: cover; 
+  background-position: center; 
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5); 
+  transition: transform 0.2s ease;
+}
+
+.avatar-upload:hover .avatar-preview { 
+  transform: scale(1.05); 
+}
+
+.avatar-badge {
+  position: absolute; 
+  bottom: 0; 
+  right: 0; 
+  background-color: #FFD700; 
+  color: #000; 
+  border-radius: 50%;
+  width: 28px; 
+  height: 28px; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  border: 2px solid #000;
+}
+
+.avatar-badge i { 
+  width: 14px; 
+  height: 14px; 
+}
+
+#uploadFoto { 
+  display: none; 
+}
+
+/* Lista de Jogadores Conectados */
+.players-list-title { 
+  color: #9999aa; 
+  font-size: 0.9rem; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  margin-bottom: 10px; 
+  align-self: flex-start; 
+}
+
+.players-list { 
+  width: 100%; 
+  max-height: 180px; 
+  overflow-y: auto; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 10px; 
+  margin-bottom: 20px; 
+}
+
+.player-card { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  background-color: #0d0d15; 
+  padding: 8px 12px; 
+  border-radius: 8px; 
+  border: 1px solid #2a2a38; 
+}
+
+.player-avatar {
+  width: 38px; 
+  height: 38px; 
+  border-radius: 50%; 
+  border: 2px solid #FFD700; 
+  background-color: #1a1a24;
+  color: #FFD700; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
+  font-weight: 700; 
+  background-size: cover; 
+  background-position: center;
+}
+
+.player-name { 
+  color: #FFFFFF; 
+  font-weight: 700; 
+  font-size: 1rem; 
+  flex: 1; 
+  text-align: left; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
+}
+
+.crown-icon { 
+  color: #FFD700; 
+  width: 16px; 
+  height: 16px; 
+}
+
+/* ==========================================================================
+   6. INTERFACE DO JOGO (HUD E CANVAS)
+   ========================================================================== */
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 92%;
+  max-width: 640px;
+  display: none;
+  background: rgba(13, 13, 21, 0.72);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 215, 0, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0px 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+#controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-size: 14px;
+}
+
+#legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 12.5px;
+  scrollbar-width: none;
+}
+
+#legend::-webkit-scrollbar { display: none; }
+
+#legend span {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ldot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.15);
+}
+
+#canvasWrap {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  opacity: 0;
+}
+
+#canvasWrap.map-reveal {
+  animation: mapReveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes mapReveal {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* ==========================================================================
+   7. CONTAGEM REGRESSIVA (INÍCIO DA PARTIDA)
+   ========================================================================== */
+#popupCountdown {
+  background-color: rgba(5, 5, 10, 0.85);
+  backdrop-filter: blur(10px);
+}
+
+.countdown-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.countdown-label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #FFD700;
+}
+
+.countdown-ring {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.25);
+}
+
+/* Anel de progresso em SVG: esvazia suavemente a cada segundo, em vez
+   de uma borda estática — deixa o timer mais claro e mais bonito. */
+.countdown-ring-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.countdown-ring-bg {
+  fill: none;
+  stroke: rgba(255, 215, 0, 0.15);
+  stroke-width: 6;
+}
+
+.countdown-ring-progress {
+  fill: none;
+  stroke: #FFD700;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 439.8;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.9s linear;
+  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.55));
+}
+
+.countdown-number {
+  position: relative;
+  z-index: 1;
+  font-family: 'Roboto Slab', serif;
+  font-weight: 900;
+  font-size: 4rem;
+  color: #FFFFFF;
+  animation: countdownPulse 1s ease-out;
+}
+
+@keyframes countdownPulse {
+  0% { transform: scale(1.5); opacity: 0; }
+  30% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ==========================================================================
+   8. BOTÃO "CONFIGURAÇÕES DA SALA" — TRAVADO PARA QUEM NÃO É HOST
+   ========================================================================== */
+.btn-config.btn-config-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  justify-content: center;
+}
+
+.btn-config.btn-config-locked i {
+  width: 20px;
+  height: 20px;
+  color: #FFD700;
+  margin: 0;
+}
