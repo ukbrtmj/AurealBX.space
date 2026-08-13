@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="style.css">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
@@ -99,11 +100,18 @@
         <option value="AFRICA">África</option>
         <option value="ARQUIPELAGO">Arquipélago</option>
         <option value="BRASIL">Brasil</option>
+        <option value="USA">Estados Unidos</option>
       </select>
 
       <div class="modal-actions">
         <button class="btn" id="btnSalvarConfig">Salvar</button>
       </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="popupCarregandoMapa">
+    <div class="countdown-content">
+      <span class="countdown-label">Carregando o contorno real do mapa…</span>
     </div>
   </div>
 
@@ -130,9 +138,11 @@
     <canvas id="game"></canvas>
   </div>
 
+  <script src="js/geoEngine.js"></script>
   <script src="maps/Africa/africa.js"></script>
   <script src="maps/Arquipelago/arquipelago.js"></script>
   <script src="maps/Brasil/brasil.js"></script>
+  <script src="maps/USA/usa.js"></script>
   <script src="js/entities.js"></script>
 
   <script>
@@ -175,7 +185,7 @@
     let isHost = false;
     let meuIndexJogador = 1;
     let onlineMode = false; // true quando Host ou Cliente de uma partida online
-    let mapaSelecionado = 'AFRICA'; // mapa escolhido em "Configurações da Sala"
+    let mapaSelecionado = 'BRASIL'; // mapa escolhido em "Configurações da Sala"
 
     // Instância de Rede (Socket.IO — conecta no servidor da Discloud, que é
     // quem decide o resultado dos ataques e sincroniza pra todo mundo)
@@ -193,6 +203,31 @@
     function aplicarMapaSelecionado() {
       const mapa = (window.MAPS && window.MAPS[mapaSelecionado]) || window.MAPS.AFRICA;
       if (mapa) window.CURRENT_MAP = mapa;
+
+      // Mapas 'geo' (Brasil, EUA) buscam o contorno real assim que o mapa
+      // é escolhido — não espera a partida começar. Assim, na hora de
+      // iniciar (ver iniciarTelaJogo), o fetch já está pronto (ou quase)
+      // e a tela de "carregando" quase nunca chega a aparecer de verdade.
+      if (mapa && mapa.type === 'geo' && typeof GeoEngine !== 'undefined') {
+        GeoEngine.loadGeoMap(mapa);
+      }
+    }
+
+    // Espera a geometria real do mapa atual terminar de carregar (só faz
+    // sentido pra mapas 'geo'). Mostra um overlay simples só se a espera
+    // realmente for perceptível — no caso comum (já pré-carregado acima)
+    // a Promise resolve na hora e o overlay nem chega a aparecer.
+    async function garantirMapaCarregado() {
+      if (!CURRENT_MAP || CURRENT_MAP.type !== 'geo' || typeof GeoEngine === 'undefined') return;
+
+      const overlay = document.getElementById('popupCarregandoMapa');
+      const timer = setTimeout(() => overlay.classList.add('active'), 200);
+      try {
+        await GeoEngine.loadGeoMap(CURRENT_MAP);
+      } finally {
+        clearTimeout(timer);
+        overlay.classList.remove('active');
+      }
     }
 
     // Só o host pode mexer nas configurações da sala. Para quem entrou
@@ -505,8 +540,9 @@
       el.style.animation = '';
     }
 
-    function iniciarTelaJogo() {
+    async function iniciarTelaJogo() {
       aplicarMapaSelecionado();
+      await garantirMapaCarregado();
 
       popupHost.classList.remove('active');
       homeScreen.style.display = 'none';
