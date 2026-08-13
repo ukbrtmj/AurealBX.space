@@ -13,6 +13,48 @@ let cssWidth = 0, cssHeight = 0;
 let layout = { offsetX: 0, offsetY: 0, mapW: 0, mapH: 0 };
 let delaunay, voronoi;
 
+// Mapas 'geo' (Brasil, EUA): contorno real dos territórios, projetado
+// pro canvas a cada resize(). geoRings[i] = lista de anéis (pontos em
+// px) do território i; geoCentroids[i] = seu centro real em px. Se um
+// território não tiver entrada aqui (geometria não carregou ainda ou
+// falhou), o jogo usa o Voronoi de sempre pra ele — ver territoryAt()
+// e render().
+let geoRings = [];
+let geoCentroids = [];
+
+function buildGeoProjection() {
+  geoRings = [];
+  geoCentroids = [];
+
+  const feats = CURRENT_MAP._features;
+  if (!feats || typeof d3.geoPath !== 'function') return;
+
+  const box = [[layout.offsetX, layout.offsetY], [layout.offsetX + layout.mapW, layout.offsetY + layout.mapH]];
+  const fc = { type: 'FeatureCollection', features: feats.filter(Boolean) };
+  if (!fc.features.length) return;
+
+  const projection = CURRENT_MAP.projection === 'albersUsa' ? d3.geoAlbersUsa() : d3.geoMercator();
+  projection.fitExtent(box, fc);
+  const pathGen = d3.geoPath(projection);
+
+  feats.forEach(f => {
+    if (!f) { geoRings.push(null); geoCentroids.push(null); return; }
+
+    const rings = [];
+    const polys = f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : [f.geometry.coordinates];
+    polys.forEach(poly => {
+      // poly[0] = anel externo. Ignora buracos internos (poly[1+]) —
+      // nenhum estado do BR/EUA tem enclave interno relevante pro jogo.
+      const ring = poly[0].map(([lon, lat]) => projection([lon, lat])).filter(Boolean);
+      if (ring.length) rings.push(ring);
+    });
+
+    geoRings.push(rings.length ? rings : null);
+    const c = pathGen.centroid(f);
+    geoCentroids.push(isFinite(c[0]) && isFinite(c[1]) ? { x: c[0], y: c[1] } : null);
+  });
+}
+
 // Estado do Jogo
 let state = { territories: [] };
 let moves = [];
@@ -52,8 +94,12 @@ function resize() {
 
   if (typeof CURRENT_MAP !== 'undefined') {
     computeLayout();
+    // Sempre constrói o fallback (Voronoi + máscara de costa) — ele é a
+    // base de qualquer mapa e o resultado visual pros mapas 'geo' cuja
+    // geometria real ainda não terminou de carregar (ou falhou).
     buildVoronoi();
     buildMask();
+    if (CURRENT_MAP.type === 'geo') buildGeoProjection();
   }
 }
 window.addEventListener('resize', resize);
@@ -203,7 +249,10 @@ function distributeCapitals(playersCount) {
 function initGame(config) {
   config = config || {};
   resize();
-  const points = CURRENT_MAP.countryDefs.map(c => toCanvas(c.nx, c.ny));
+  const points = CURRENT_MAP.countryDefs.map((c, i) => {
+    if (CURRENT_MAP.type === 'geo' && geoCentroids[i]) return geoCentroids[i];
+    return toCanvas(c.nx, c.ny);
+  });
 
   const territories = CURRENT_MAP.countryDefs.map((c, i) => new Territory(i, c.code, points[i].x, points[i].y));
   state = { territories };
@@ -312,6 +361,13 @@ function growthTick() {
 function territoryAt(x, y) {
   if (!state || !state.territories) return null;
   for (const t of state.territories) {
+    const rings = geoRings[t.id];
+    if (rings) {
+      for (const ring of rings) {
+        if (pointInPoly({ x, y }, ring)) return t;
+      }
+      continue; // território tem forma real: não cai pro Voronoi dele
+    }
     const poly = voronoi.cellPolygon(t.id);
     if (poly && pointInPoly({ x, y }, poly)) return t;
   }
@@ -449,13 +505,19 @@ function applySyncState(data) {
     }
   });
 
+  // Antes: duration ficava fixa em 1 e o progress só era atualizado quando
+  // um pacote novo chegava (a cada ~120ms), então as bolinhas "congelavam"
+  // entre pacotes e davam um pulo a cada sync — é isso que parecia lag.
+  // Agora guardamos a duration real (vinda do servidor) e deixamos o loop()
+  // avançar o progress localmente a cada frame (60fps), corrigindo o valor
+  // levemente a cada sync em vez de travar esperando o próximo pacote.
   moves = (data.moves || []).map(m => ({
     fromId: m.fromId,
     toId: m.toId,
     owner: m.owner,
     progress: m.progress,
     delay: 0,
-    duration: 1,
+    duration: m.duration || 1,
     maxOffset: m.maxOffset
   }));
 
@@ -514,18 +576,25 @@ function loop(now) {
       if (p.life <= 0) hitParticles.splice(i, 1);
     }
 
-    if (authority) {
-      for (let i = moves.length - 1; i >= 0; i--) {
-        const m = moves[i];
-        if (m.delay > 0) {
-          m.delay -= dt;
-          continue;
-        }
+    // Avança o progress de todo mundo a cada frame (60fps), online ou não,
+    // pra bolinha andar suave. Em modo online, quem decide de verdade se a
+    // tropa chegou é o servidor (via evento 'events' no syncState) — aqui
+    // só travamos em 1 pra não passar do território visualmente enquanto
+    // esperamos o próximo pacote confirmar a chegada.
+    for (let i = moves.length - 1; i >= 0; i--) {
+      const m = moves[i];
+      if (m.delay > 0) {
+        m.delay -= dt;
+        continue;
+      }
 
-        m.progress += dt / m.duration;
-        if (m.progress >= 1) {
+      m.progress += dt / m.duration;
+      if (m.progress >= 1) {
+        if (authority) {
           resolveArrival(m);
           moves.splice(i, 1);
+        } else {
+          m.progress = 1;
         }
       }
     }
@@ -553,30 +622,49 @@ function render() {
   offCtx.scale(dpr, dpr);
   offCtx.clearRect(0, 0, cssWidth, cssHeight);
 
+  let usouFormaReal = false;
+
   for (const t of state.territories) {
-    const poly = voronoi.cellPolygon(t.id);
-    if (!poly) continue;
+    const rings = geoRings[t.id];
     offCtx.beginPath();
-    poly.forEach((p, i) => i === 0 ? offCtx.moveTo(p[0], p[1]) : offCtx.lineTo(p[0], p[1]));
-    offCtx.closePath();
+
+    if (rings) {
+      usouFormaReal = true;
+      rings.forEach(ring => {
+        ring.forEach((p, i) => i === 0 ? offCtx.moveTo(p[0], p[1]) : offCtx.lineTo(p[0], p[1]));
+        offCtx.closePath();
+      });
+    } else {
+      const poly = voronoi.cellPolygon(t.id);
+      if (!poly) continue;
+      poly.forEach((p, i) => i === 0 ? offCtx.moveTo(p[0], p[1]) : offCtx.lineTo(p[0], p[1]));
+      offCtx.closePath();
+    }
 
     offCtx.fillStyle = CURRENT_MAP.colors[t.owner];
     offCtx.fill();
 
+    // Fronteiras reais têm bem mais vértices/estados vizinhos que o
+    // Voronoi, então uma linha mais fina fica mais fiel ao contorno real.
     offCtx.strokeStyle = '#0f172a';
-    offCtx.lineWidth = 2.5;
+    offCtx.lineWidth = rings ? 1.4 : 2.5;
     offCtx.stroke();
 
     if (selected && selected.id === t.id) {
       offCtx.strokeStyle = '#ffffff';
-      offCtx.lineWidth = 3.5;
+      offCtx.lineWidth = rings ? 2.4 : 3.5;
       offCtx.stroke();
     }
   }
 
-  offCtx.globalCompositeOperation = 'destination-in';
-  offCtx.drawImage(maskCanvas, 0, 0, cssWidth, cssHeight);
-  offCtx.globalCompositeOperation = 'source-over';
+  // A máscara de costa (recorte pro contorno do país) só existe pro
+  // Voronoi — territórios de forma real já têm o contorno certo por
+  // conta própria, recortar de novo só distorceria as bordas.
+  if (!usouFormaReal || CURRENT_MAP.type !== 'geo') {
+    offCtx.globalCompositeOperation = 'destination-in';
+    offCtx.drawImage(maskCanvas, 0, 0, cssWidth, cssHeight);
+    offCtx.globalCompositeOperation = 'source-over';
+  }
   offCtx.restore();
 
   ctx.drawImage(offCanvas, 0, 0, cssWidth, cssHeight);
